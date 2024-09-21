@@ -1,0 +1,136 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36" version="24.7.16">
+  <diagram name="Page-1" id="S8F8ERdwk2yVXLX5cYZ_">
+    <mxGraphModel dx="875" dy="474" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-2" value="" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="520" y="80" width="240" height="470" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-3" value="Server app.exe" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=23;" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="180" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-4" value="192.168.1.100" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="590" y="48" width="100" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-5" value="" style="sketch=0;pointerEvents=1;shadow=0;dashed=0;html=1;strokeColor=none;fillColor=#005F4B;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;align=center;outlineConnect=0;shape=mxgraph.veeam2.laptop;" vertex="1" parent="1">
+          <mxGeometry y="100" width="120" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-6" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="160" y="110" as="sourcePoint" />
+            <mxPoint x="500" y="110" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-8" value="http://GET 192.168.1.100/client.html" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-6">
+          <mxGeometry x="-0.1845" y="1" relative="1" as="geometry">
+            <mxPoint x="26" y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-7" value="Client&lt;div&gt;Web Browser&lt;/div&gt;&lt;div&gt;192.168.1.50&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-12" value="" style="endArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="160" y="140" as="sourcePoint" />
+            <mxPoint x="500" y="140" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-14" value="http://POST 192.168.1.100/connect&lt;br&gt;(STP offer)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-12">
+          <mxGeometry x="-0.006" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-16" value="" style="endArrow=classic;html=1;rounded=0;dashed=1;dashPattern=1 4;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="170" as="sourcePoint" />
+            <mxPoint x="200" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-18" value="Response: STP accept, &lt;br style=&quot;font-size: 10px;&quot;&gt;ICE server list (192.168.1.50, 192.168.1.100)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-16">
+          <mxGeometry y="-1" relative="1" as="geometry">
+            <mxPoint y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-19" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="160" y="254.58" as="sourcePoint" />
+            <mxPoint x="500" y="254.58" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-20" value="WebRTC connection request&lt;div style=&quot;font-size: 10px;&quot;&gt;Established direct connection - no intermediary ICE servers exist&lt;/div&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-19">
+          <mxGeometry x="0.0765" y="-1" relative="1" as="geometry">
+            <mxPoint x="-13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-21" value="Webserver (axum)&lt;div&gt;/*&lt;/div&gt;&lt;div&gt;/connect&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="540" y="100" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-23" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1" target="1OfXS_3ZnrJGWq4nSBME-24">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="660" y="135" as="sourcePoint" />
+            <mxPoint x="820" y="135" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-24" value="" style="sketch=0;pointerEvents=1;shadow=0;dashed=0;html=1;strokeColor=none;fillColor=#505050;labelPosition=center;verticalLabelPosition=bottom;verticalAlign=top;outlineConnect=0;align=center;shape=mxgraph.office.devices.hard_disk;" vertex="1" parent="1">
+          <mxGeometry x="790" y="108" width="40" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-26" value="&amp;nbsp; WebRTC Signalling System" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="540" y="190" width="200" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-27" value="" style="endArrow=classic;startArrow=classic;html=1;rounded=0;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="710" y="212" as="sourcePoint" />
+            <mxPoint x="674" y="149" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="710" y="148" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-28" value="Static pages provider (./web folder)" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+          <mxGeometry x="770" y="70" width="80" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-29" value="Generate accept offer&lt;br style=&quot;font-size: 9px;&quot;&gt;with short lifetime" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="630" y="210" width="110" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-30" value="&lt;font style=&quot;font-size: 9px;&quot;&gt;Remove accept offer&lt;/font&gt;&lt;div style=&quot;font-size: 9px;&quot;&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;Add to active connections array&lt;/font&gt;&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="530" y="235" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-31" value="" style="endArrow=classic;html=1;rounded=0;dashed=1;dashPattern=1 4;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="200" y="314.58" as="sourcePoint" />
+            <mxPoint x="500" y="314.58" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-32" value="Client2Server packet" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-31">
+          <mxGeometry x="-0.1533" y="-1" relative="1" as="geometry">
+            <mxPoint x="13" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-34" value="Application Server:&lt;br style=&quot;font-size: 11px;&quot;&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;&lt;br style=&quot;&quot;&gt;&lt;/font&gt;&lt;div style=&quot;font-size: 9px;&quot;&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;We can finally meaningfully communicate with the client / clients. Requires traversing an async boundary - probably abstracted over.&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="540" y="330" width="200" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-33" value="&lt;div&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;WebRTC peer&lt;/font&gt;&lt;/div&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;Connection listener&lt;/font&gt;&lt;div style=&quot;font-size: 9px;&quot;&gt;&lt;font style=&quot;font-size: 9px;&quot;&gt;async (tokio)&lt;/font&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="550" y="300" width="80" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-35" value="" style="endArrow=classic;html=1;rounded=0;dashed=1;dashPattern=1 4;" edge="1" parent="1">
+          <mxGeometry width="50" height="50" relative="1" as="geometry">
+            <mxPoint x="500" y="340" as="sourcePoint" />
+            <mxPoint x="200" y="340" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-37" value="Server2Client packet" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="1OfXS_3ZnrJGWq4nSBME-35">
+          <mxGeometry x="-0.2689" y="-2" relative="1" as="geometry">
+            <mxPoint x="-50" y="2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-39" value="" style="strokeWidth=1;html=1;shape=mxgraph.flowchart.annotation_2;align=left;labelPosition=right;pointerEvents=1;fillColor=default;strokeColor=#3333FF;" vertex="1" parent="1">
+          <mxGeometry x="140" y="130" width="20" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="1OfXS_3ZnrJGWq4nSBME-40" value="Driven by&lt;div&gt;client.html&lt;/div&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="60" y="220" width="80" height="40" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
