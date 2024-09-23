@@ -2,6 +2,7 @@ use std::net::{Ipv4Addr, SocketAddr};
 
 use axum::{extract::ConnectInfo, routing::post, Json, Router};
 use just_webrtc::types::SessionDescription;
+use log::info;
 use serde_json::{json, Value};
 use tower_http::services::{ServeDir, ServeFile};
 
@@ -21,9 +22,12 @@ pub async fn webserver_run(port: u16) {
     let socket = SocketAddr::from((WEBSERVER_HOST, port));
     let listener = tokio::net::TcpListener::bind(socket).await.unwrap();
     let server = axum::serve(listener, app);
-    println!("Webserver listening at {} (access: http://127.0.0.1:{}/)", socket, socket.port());
+    info!("Webserver listening at {} (access: http://127.0.0.1:{}/)", socket, socket.port());
 
-    server.await.unwrap(); // Run it
+    async fn shutdown_detector(){ tokio::signal::ctrl_c().await.unwrap() }
+    server
+        .with_graceful_shutdown(shutdown_detector())
+        .await.unwrap(); // Run it
 }
 
 async fn respond_to_webrtc_offer(ConnectInfo(addr): ConnectInfo<SocketAddr>, payload: Option<Json<SessionDescription>>)->Json<Value>{

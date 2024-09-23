@@ -1,8 +1,9 @@
-use std::{sync::{Mutex, OnceLock}, time::Duration};
+use std::{sync::Mutex, time::Duration};
 
 use anyhow::Result;
 use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
 use lazy_static::lazy_static;
+use log::info;
 use serde::Serialize;
 
 use crate::{util::UUIDGen, webrtcpeer, ClientConnection};
@@ -23,12 +24,12 @@ pub async fn create_offer(offer: SessionDescription, connectionsource: String) -
     // remote_peer_connection.add_ice_candidates(offer.sdp_type).await?;
     let Some(answer) = remote_peer_connection.get_local_description().await else{ return Err(()) };
     let candidates = remote_peer_connection.collect_ice_candidates().await.unwrap_or_default();
-    // println!("Incoming: {:?}\n\tMy Response: {:?}\n\tCandidates: {:?}", remote_peer_connection, answer.sdp, candidates);
+    // info!("Incoming: {:?}\n\tMy Response: {:?}\n\tCandidates: {:?}", remote_peer_connection, answer.sdp, candidates);
 
-    println!("Hosting offer for {:?}", connectionsource);
+    info!("Hosting offer for {:?}", connectionsource);
     tokio::spawn(async move{
         if let Ok(conn) = await_connection(remote_peer_connection, &connectionsource).await {
-            println!("WebRTC established with {:?} as {:016x}", connectionsource, conn.get_id());
+            info!("WebRTC established with {:?} as {}", connectionsource, conn.get_connection_name());
             webrtcpeer::manage_connection(conn);
         }
     });
@@ -41,7 +42,7 @@ pub async fn await_connection(mut peer: PeerConnection, connectionsource: &str)-
     }
 
     let Ok(_) = tokio::time::timeout(REMOTE_CONNECTION_TIMEOUT, peer.wait_peer_connected()).await else {
-        println!("Gave up on offer for {:?}", connectionsource);
+        info!("Gave up on offer for {:?}", connectionsource);
         return Err(());
     };
 

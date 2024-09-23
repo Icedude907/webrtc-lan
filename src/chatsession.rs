@@ -20,7 +20,7 @@ impl ChatRoom{
     }
     // Returns a receiver that contains other participant messages
     // And a sender that can be used to push your messages out.
-    pub fn join(&mut self, joininfo: String)->(broadcast::Receiver<Message>, broadcast::Sender<Message>){
+    pub fn join(&mut self, joininfo: &String)->(broadcast::Receiver<Message>, broadcast::Sender<Message>){
         let broadcast_tx = self.broadcast_tx.clone();
         let broadcast_rx = broadcast_tx.subscribe();
         // Announce new participant

@@ -4,13 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WebRTC Chat Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #displayBox {
+            max-width: 50em;
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+        }
+        #inputBox, #submitButton {
+            display: inline-block;
+            vertical-align: top;
+        }
+        #inputBox {
+            max-width: 44em;
+            width: calc(100% - 100px);
+        }
+        #submitButton {
+            width: 80px;
+        }
+    </style>
 </head>
 <body>
     <h1 id="connectionStatus">Loading…</h1>
     <textarea id="displayBox" readonly></textarea><br>
     <input type="text" id="inputBox" placeholder="Write your message here">
     <button id="submitButton" onclick="submitMessage()">Submit</button>
-
     <script src="main.js"></script>
 </body>
 </html>
