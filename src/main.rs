@@ -2,6 +2,7 @@ mod webserver;
 mod webrtcsignalling;
 mod webrtcpeer;
 mod chatsession;
+mod util;
 
 use tokio::join;
 use webrtcpeer::ClientConnection;
@@ -19,8 +20,5 @@ async fn main(){
 }
 
 pub async fn manage_remotes(){
-    // if let Some(peer_connection) = wait_for_connection().await {
-    //     // Move the peer_connection out of the global state into the local state
-    //     // Implement your logic here
-    // }
+
 }

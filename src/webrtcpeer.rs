@@ -10,23 +10,25 @@ use crate::chatsession::CHAT;
 /// The unreliable stream is for the client's inputs with the server
 #[derive(new)]
 pub struct ClientConnection{
-    as_peer: PeerConnection,
-    as_channel: Channel,
+    peer: PeerConnection,
+    main_channel: Channel,
+    connection_id: u64,
 }
 
 impl ClientConnection{
     pub async fn recv(&mut self)->Result<Bytes, WebRTCError>{
-        self.as_channel.receive().await
+        self.main_channel.receive().await
     }
     // usize = bytes sent
     pub async fn send(&mut self, data: &Bytes)->Result<usize, WebRTCError>{
-        self.as_channel.send(data).await
+        self.main_channel.send(data).await
     }
+    pub fn get_id(&self)->u64{ self.connection_id }
 }
 
 pub fn manage_connection(mut conn: ClientConnection){
     tokio::spawn(async move{
-        let (mut broadcast, send2everyone) = CHAT.lock().unwrap().join();
+        let (mut broadcast, send2everyone) = CHAT.lock().unwrap().join(format!("...{:04X}", conn.connection_id % 0x10000));
 
         loop{tokio::select! {
             c2s = conn.recv() => match c2s{

@@ -18,16 +18,18 @@ pub async fn webserver_run(port: u16) {
         .fallback_service(serve_dir)
         .into_make_service_with_connect_info::<SocketAddr>();
 
-    // run our app with hyper, listening globally on port 3000
     let socket = SocketAddr::from((WEBSERVER_HOST, port));
     let listener = tokio::net::TcpListener::bind(socket).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let server = axum::serve(listener, app);
+    println!("Webserver listening at {} (access: http://127.0.0.1:{}/)", socket, socket.port());
+
+    server.await.unwrap(); // Run it
 }
 
 async fn respond_to_webrtc_offer(ConnectInfo(addr): ConnectInfo<SocketAddr>, payload: Option<Json<SessionDescription>>)->Json<Value>{
     if let Some(params) = payload {
         let id = format!("{}", addr);
-        let x = webrtcsignalling::add_remote_peer(params.0, id).await.unwrap();
+        let x = webrtcsignalling::create_offer(params.0, id).await.unwrap();
         return Json(json!(x));
     }else{
         return Json(json!({"Malformed":"LOL"}));
