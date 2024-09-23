@@ -31,7 +31,7 @@ impl ClientConnection{
 
 pub fn manage_connection(mut conn: ClientConnection){
     tokio::spawn(async move{
-        let short_name = format!("...{:04X}", conn.get_id() % 0x10000);
+        let short_name = format!("*{:04X}", conn.get_id() % 0x10000);
         let (mut broadcast, send2everyone) = CHAT.lock().unwrap().join(&short_name);
         // TODO: How to close the connection (without waiting for a failed send / manually implementing timeouts?)
         loop{tokio::select! {
@@ -39,7 +39,8 @@ pub fn manage_connection(mut conn: ClientConnection){
                 // Receive data
                 Ok(msg)=>{
                     info!("{}> {:?}", conn.get_connection_name(), msg);
-                    let _ = send2everyone.send( String::from_utf8_lossy(&msg).into_owned() );
+                    let msg = format!("{}: {}", short_name, String::from_utf8_lossy(&msg));
+                    let _ = send2everyone.send(msg);
                 },
                 // Connection shutdown
                 Err(_)=>{ warn!("Unexpected error. Closing connection."); break; }
