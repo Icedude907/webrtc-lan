@@ -9,44 +9,9 @@ async function connect(){
     comm = local.createDataChannel("c2s", {
         // WebRTC is packet based but normally reliable+ordered in transmission
         // You can disable these by flipping these switches, making the connection UDP-like
-        // It might be worth doing this in the future.
         // maxRetransmits: 0, ordered: false,
     })
-    // Handlers
-    comm.onopen = () => {
-        setConnectionStatus("Channel Connected");
-    }
-    comm.onclose = () => {
-        setConnectionStatus("Channel Disconnected");
-    }
-    comm.onmessage = ({data}) => {
-        let msg = new TextDecoder("utf-8").decode(data);
-        addToLog(msg);
-    }
-    local.onconnectionstatechange = (e) => {
-        const state = this.iceConnectionState;
-        switch (state) {
-            case "new": case "connecting":
-                setConnectionStatus("Connecting…");
-                break;
-            case "connected":
-                setConnectionStatus("Connection Online");
-                break;
-            case "disconnected":
-                setConnectionStatus("Disconnecting…");
-                break;
-            case "closed":
-                setConnectionStatus("Connection Offline");
-                break;
-            case "failed":
-                setConnectionStatus("Connection Error");
-                break;
-            case undefined:
-                break;
-            default:
-                setConnectionStatus(`Unknown: ${state}`);
-        }
-    }
+    setupConectionHandlers(local, comm);
     // Do the connection
     let offer = await local.createOffer();
     local.setLocalDescription(offer);
@@ -62,6 +27,46 @@ async function exchange_connection_details(offer){
         headers: { "Content-type": "application/json; charset=UTF-8" }
     });
     return await response.json();
+}
+function setupConectionHandlers(peer, channel){
+    // State handlers
+    channel.onopen  = () => setConnectionStatus("Chan Connected");
+    channel.onclose = () => {
+        setConnectionStatus("Chan Disconnected");
+        peer.close(); // If the channel is unexpectedly closed our connection is finished.
+    }
+
+    peer.oniceconnectionstatechange = (e) => {
+        const state = peer.iceConnectionState;
+        switch (state) {
+            case "new"          : setConnectionStatus("ICE new"); break;
+            case "checking"     : setConnectionStatus("Ice checking"); break;
+            case "connected"    : setConnectionStatus("ICE connected"); break;
+            case "completed"    : setConnectionStatus("ICE connection completed"); break;
+            case "disconnected" : setConnectionStatus("ICE disonnected"); break;
+            case "failed"       : setConnectionStatus("ICE failed"); break;
+            case "closed"       : setConnectionStatus("ICE closed"); break;
+            default             : setConnectionStatus(`ICE unk: ${state}`);
+        }
+    }
+    peer.onconnectionstatechange = (e) => {
+        const state = peer.connectionState;
+
+        switch (state) {
+            case "new"          : setConnectionStatus("Conn new"); break;
+            case "connecting"   : setConnectionStatus("Conn connecting"); break;
+            case "connected"    : setConnectionStatus("Conn connected"); break;
+            case "disconnected" : setConnectionStatus("Conn disonnected"); break;
+            case "failed"       : setConnectionStatus("Conn failed"); break;
+            case "closed"       : setConnectionStatus("Conn closed"); break;
+            default             : setConnectionStatus(`Conn unknown: ${state}`);
+        }
+    }
+    // Data handler
+    channel.onmessage = ({data}) => {
+        let msg = new TextDecoder("utf-8").decode(data);
+        addToLog(msg);
+    }
 }
 
 function setConnectionStatus(status){
