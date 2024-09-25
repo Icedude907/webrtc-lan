@@ -36,30 +36,25 @@ function setupConectionHandlers(peer, channel){
         peer.close(); // If the channel is unexpectedly closed our connection is finished.
     }
 
-    peer.oniceconnectionstatechange = (e) => {
-        const state = peer.iceConnectionState;
-        switch (state) {
-            case "new"          : setConnectionStatus("ICE new"); break;
-            case "checking"     : setConnectionStatus("Ice checking"); break;
-            case "connected"    : setConnectionStatus("ICE connected"); break;
-            case "completed"    : setConnectionStatus("ICE connection completed"); break;
-            case "disconnected" : setConnectionStatus("ICE disonnected"); break;
-            case "failed"       : setConnectionStatus("ICE failed"); break;
-            case "closed"       : setConnectionStatus("ICE closed"); break;
-            default             : setConnectionStatus(`ICE unk: ${state}`);
-        }
-    }
     peer.onconnectionstatechange = (e) => {
         const state = peer.connectionState;
 
         switch (state) {
-            case "new"          : setConnectionStatus("Conn new"); break;
-            case "connecting"   : setConnectionStatus("Conn connecting"); break;
-            case "connected"    : setConnectionStatus("Conn connected"); break;
-            case "disconnected" : setConnectionStatus("Conn disonnected"); break;
-            case "failed"       : setConnectionStatus("Conn failed"); break;
-            case "closed"       : setConnectionStatus("Conn closed"); break;
-            default             : setConnectionStatus(`Conn unknown: ${state}`);
+             case "new": case "connecting":
+                setConnectionStatus("Connecting...");
+                break;
+            case "connected":
+                setConnectionStatus("Connection established");
+                break;
+            case "disconnected":
+                setConnectionStatus("Connection interrupted. Attempting to re-establish...");
+                break;
+            case "failed":
+                setConnectionStatus("Connection finished (failed)");
+                break;
+            case "closed":
+                setConnectionStatus("Connection finished (closed)");
+                break;
         }
     }
     // Data handler
