@@ -1,6 +1,5 @@
 use std::{sync::Mutex, time::Duration};
 
-use anyhow::Result;
 use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
 use lazy_static::lazy_static;
 use log::info;

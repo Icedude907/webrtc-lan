@@ -1,6 +1,6 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::{extract::ConnectInfo, routing::post, Json, Router};
+use axum::{extract::ConnectInfo, middleware::map_response, response::Response, routing::{self, post}, Json, Router};
 use just_webrtc::types::SessionDescription;
 use log::info;
 use serde_json::{json, Value};
@@ -12,11 +12,13 @@ const WEBSERVER_HOST: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
 
 pub async fn webserver_run(port: u16) {
     // Serve the web folder with the game wasm in it
+
     let serve_dir = ServeDir::new("web").not_found_service(ServeFile::new("web/index.html"));
+    let serve_nocache = routing::get_service(serve_dir).layer(map_response(disable_browser_cache));
 
     let app = Router::new()
         .route("/connect", post(respond_to_webrtc_offer)) // Also the signalling subsystem
-        .fallback_service(serve_dir)
+        .fallback_service(serve_nocache)
         .into_make_service_with_connect_info::<SocketAddr>();
 
     let socket = SocketAddr::from((WEBSERVER_HOST, port));
@@ -38,4 +40,15 @@ async fn respond_to_webrtc_offer(ConnectInfo(addr): ConnectInfo<SocketAddr>, pay
     }else{
         return Json(json!({"Malformed":"LOL"}));
     }
+}
+
+async fn disable_browser_cache<R>(mut r: Response<R>) -> Response<R>{
+    let headers = r.headers_mut();
+    headers.insert(
+        "Cache-Control",
+        "no-cache, no-store, must-revalidate".parse().unwrap(),
+    );
+    headers.insert("Pragma", "no-cache".parse().unwrap());
+    headers.insert("Expires", "0".parse().unwrap());
+    r
 }
