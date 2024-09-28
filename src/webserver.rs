@@ -1,17 +1,14 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::{extract::ConnectInfo, http::{header, Uri}, response::{IntoResponse, Redirect, Response}, routing::{get, post}, Json, Router};
+use axum::{extract::ConnectInfo, http::{header, HeaderMap, Uri}, response::{IntoResponse, Redirect, Response}, routing::{get, post}, Json, Router};
 use just_webrtc::types::SessionDescription;
 use log::info;
+use rust_embed_for_web::EmbedableFile;
 use serde_json::{json, Value};
 
 use crate::webrtcsignalling;
 
 const WEBSERVER_HOST: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
-
-#[derive(rust_embed::Embed)]
-#[folder = "webclient/dist/"]
-struct Assets;
 
 pub async fn webserver_run(port: u16) {
     // Serve the web folder with the client in it
@@ -32,24 +29,43 @@ pub async fn webserver_run(port: u16) {
         .await.unwrap(); // Run it
 }
 
-async fn serve_index() -> impl IntoResponse{
-    StaticFile("index.html")
+async fn serve_index(headers: HeaderMap) -> impl IntoResponse{
+    StaticFile("index.html", headers)
 }
 
-async fn serve_static(uri: Uri) -> impl IntoResponse {
+async fn serve_static(uri: Uri, headers: HeaderMap) -> impl IntoResponse {
     let path = uri.path().trim_start_matches('/').to_string();
-    StaticFile(path)
+    StaticFile(path, headers)
 }
 
-pub struct StaticFile<T>(pub T);
+#[derive(rust_embed_for_web::RustEmbed)]
+#[folder = "webclient/dist/"]
+#[gzip = false] // Not targeting these plebs
+struct StaticFiles;
+
+pub struct StaticFile<T>(pub T, HeaderMap);
 impl<T> IntoResponse for StaticFile<T> where T: Into<String>{
   fn into_response(self) -> Response {
     let path = self.0.into();
+    let file = StaticFiles::get(path.as_str());
 
-    match Assets::get(path.as_str()) {
+    let requested_br = self.1.get(header::ACCEPT_ENCODING).map(|x| x.to_str().unwrap_or("").contains("br")).unwrap_or(false);
+
+    match file {
       Some(content) => {
         let mime = mime_guess::from_path(path).first_or_octet_stream();
-        ([(header::CONTENT_TYPE, mime.as_ref())], content.data).into_response()
+        let mut using_br = false;
+        let data = if requested_br {
+          if let Some(x) = content.data_br() { using_br = true; x} else { content.data() }
+        } else { content.data() };
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::CONTENT_TYPE, mime.to_string().parse().unwrap());
+        if using_br {
+            headers.insert(header::CONTENT_ENCODING, "br".parse().unwrap());
+        }
+
+        (headers, data).into_response()
       }
       None => {
         // Not found -> redirect

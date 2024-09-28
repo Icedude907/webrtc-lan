@@ -16,3 +16,10 @@ impl UUIDGen{
         return self.prev;
     }
 }
+
+#[macro_export]
+macro_rules! fi {
+    ($condition:expr, $true_case:expr, $false_case:expr) => {
+        if $condition { $true_case } else { $false_case }
+    };
+}
