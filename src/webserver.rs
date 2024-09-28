@@ -13,12 +13,12 @@ const WEBSERVER_HOST: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
 pub async fn webserver_run(port: u16) {
     // Serve the web folder with the game wasm in it
 
-    let serve_dir = ServeDir::new("web").not_found_service(ServeFile::new("web/index.html"));
-    let serve_nocache = routing::get_service(serve_dir).layer(map_response(disable_browser_cache));
+    let serve_dir = ServeDir::new("webclient/dist/").not_found_service(ServeFile::new("webclient/dist/index.html"));
+    // let serve_nocache = routing::get_service(serve_dir).layer(map_response(disable_browser_cache));
 
     let app = Router::new()
         .route("/connect", post(respond_to_webrtc_offer)) // Also the signalling subsystem
-        .fallback_service(serve_nocache)
+        .fallback_service(serve_dir)
         .into_make_service_with_connect_info::<SocketAddr>();
 
     let socket = SocketAddr::from((WEBSERVER_HOST, port));

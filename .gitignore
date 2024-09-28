@@ -1,1 +1,6 @@
-/target
+# Server build artifacts
+target/
+# Web client build artifacts
+node_modules/
+.parcel-cache/
+dist/
