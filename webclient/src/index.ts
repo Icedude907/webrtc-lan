@@ -1,7 +1,7 @@
-let comm = undefined;
+let comm: RTCDataChannel;
 
 // Connect to the WebRTC server
-document.addEventListener('DOMContentLoaded', (event) => {
+document.addEventListener('DOMContentLoaded', (_) => {
     connect();
 })
 async function connect(){
@@ -15,12 +15,15 @@ async function connect(){
     // Do the connection
     let offer = await local.createOffer();
     local.setLocalDescription(offer);
-    let response = await exchange_connection_details(offer);
+    let response: {
+        description: RTCSessionDescriptionInit,
+        candidates: RTCIceCandidateInit[]
+    } = await exchange_connection_details(offer);
     local.setRemoteDescription(response.description);
     response.candidates.forEach(e => { local.addIceCandidate(e) });
 }
 // Detail exchange
-async function exchange_connection_details(offer){
+async function exchange_connection_details(offer: RTCSessionDescriptionInit){
     let response = await fetch("/connect", {
         method: "POST",
         body: JSON.stringify(offer),
@@ -28,7 +31,7 @@ async function exchange_connection_details(offer){
     });
     return await response.json();
 }
-function setupConectionHandlers(peer, channel){
+function setupConectionHandlers(peer: RTCPeerConnection, channel: RTCDataChannel){
     // State handlers
     channel.onopen  = () => setConnectionStatus("Chan Connected");
     channel.onclose = () => {
@@ -64,22 +67,22 @@ function setupConectionHandlers(peer, channel){
     }
 }
 
-function setConnectionStatus(status){
+function setConnectionStatus(status: string){
     console.log(`Status -> ${status}`);
-    document.getElementById("connectionStatus").innerText = status;
+    document.getElementById("connectionStatus")!.innerText = status;
 }
 
-function addToLog(msg){
-    const displayBox = document.getElementById('displayBox');
+function addToLog(msg: string){
+    const displayBox = document.getElementById('displayBox') as HTMLInputElement;
     displayBox.value += msg + '\n';
 }
 // Send messages
 function submitMessage() {
-    const inputBox = document.getElementById('inputBox');
-    comm.send(new TextEncoder("utf-8").encode(inputBox.value));
+    const inputBox = document.getElementById('inputBox') as HTMLInputElement;
+    comm.send(new TextEncoder().encode(inputBox.value));
     inputBox.value = '';
 }
-document.getElementById('inputBox').addEventListener('keypress', function(event) {
+document.getElementById('inputBox')!.addEventListener('keypress', function(event) {
     if (event.key === 'Enter') {
         event.preventDefault(); // Prevent the default action (form submission)
         submitMessage();
