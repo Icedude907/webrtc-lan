@@ -39,3 +39,19 @@ UdpSocket::bind("192.168.1.100")?
 
 Why can't things be simple like on native apps? All I wanted was a client and a server. I don't need all the additional bells and whistles like hole=punching, ICE relays and direct-video channels, right now. Of course the system has to be so complex. Raw UDP sockets for the web when?
 ![](./docs/README/ClientServer.png)
+
+-----
+
+## Build
+To build this project, you will need:
+- The rust build system `cargo`
+- A node-equivalent like `pnpm`
+- `make` makes building for release a bit more convenient. Else you just type a few commands.
+
+#### Debug building
+- `cargo run` will host the web server. Static pages will be served from `./webclient/dist`
+- `pnpm build` will update the `dist` folder with your modified web files
+
+#### Release building
+- `make release` or type the commands contained into your terminal
+- Output is a single file `./target/release/webrtc_native_rceiver.exe` that has static assets built in.

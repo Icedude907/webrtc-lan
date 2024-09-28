@@ -17,6 +17,8 @@ just-webrtc = "0.1"     # WebRTC communications
 bytes = "1.7.2"         # Util (networking)
 derive-new = "0.7.0"    # Util (macro)
 lazy_static = "1.5.0"   # Util (macro)
+rust-embed = "8.5.0"
+mime_guess = "2.0.5"
 
 # anyhow = "1.0.89"
 # webrtc-unreliable = "0.6.0"
