@@ -1,19 +1,23 @@
 # Realtime Client/Server communication over LAN in a browser
 That's what this project showcases.
+![Sample](./docs/README/Operation.png)
 
-Out of the three somewhat viable methods I had to do this:
+------
+
+### The theory
+Out of the three viable methods I had to do this:
 - Http request polling
 - Websockets
 - WebRTC
 
-WebRTC is the only one that's packet based and doesn't require pesky ACKs that slow down real-time communication.
+WebRTC is the only one that's packet based and doesn't require packet ordering (which slows down real-time communication).
 
 However: *This has been quite an ordeal.*
 
-### Solution
+#### Solution
 Roll the webserver serving the client application, a custom signalling subsystem, the application's server system, and the WebRTC peer connection code into a single application.
 
-This is how it works:
+This is how the connection is established:
 1. Provide the client with a client applet (`index.html`) via the webserver (currently [`axum`](https://github.com/tokio-rs/axum))
 2. Client POSTs a WebRTC `offer` via `./connect`. The offer is a single communication channel.
 3. Webserver communicates with the signalling system to create a response.
@@ -26,32 +30,33 @@ This is how it works:
 
 ![](./docs/README/ServerOnWebRTC.png)
 
-As a side note, this project forced me into `async` Rust (`tokio`) by virtue of `axum` and the [WebRTC](https://github.com/uniciant/just-webrtc/tree/main/crates/just-webrtc) implementation. `async` is an ordeal unto itself, presenting all forms of incompatibilities with other applications. I expect I'll be using `Send`-safe channels and `Arc` liberally to abstract over most of this.
+Project uses `tokio` because it has to. Apologies if this causes incompatibilities, its out of my hands.
 
-I'm sure webdevs don't think this was all to complex - but its a big step from:
-```bash
-python -m http.server -d ./web
-```
-```rust
-UdpSocket::bind("192.168.1.100")?
-    .send_to("192.168.1.50", &b"Hello")
-```
+This is all very complex in my mind (do web developers find this simple?) but apparently things could become simpler soon.
+There's been talk of a Raw UDP socket api for the web which, when abstracted over with a library providing redundant channels - could replace WebRTC for this use case. For now though, this complex system remains in use.
 
-Why can't things be simple like on native apps? All I wanted was a client and a server. I don't need all the additional bells and whistles like hole=punching, ICE relays and direct-video channels, right now. Of course the system has to be so complex. Raw UDP sockets for the web when?
-![](./docs/README/ClientServer.png)
+<!-- TODO: What I wanted, what I needed, what I got -->
 
 -----
 
 ## Build
 To build this project, you will need:
 - The rust build system `cargo`
-- A node-equivalent like `pnpm`
+- A node-like build tool (e.g.: `pnpm`)
 - `make` makes building for release a bit more convenient. Else you just type a few commands.
 
-#### Debug building
-- `cargo run` will host the web server. Static pages will be served from `./webclient/dist`
-- `pnpm build` will update the `dist` folder with your modified web files
+#### Debug
+- `cargo run` will host the web server. Static pages will be served from `./webclient/dist` relative to working directory.
+- `pnpm build` will update the `dist` folder with your modified web files. This works as soon as you refresh the page (take care with client-side caching behaviour).
 
 #### Release building
 - `make release` or type the commands contained into your terminal
-- Output is a single file `./target/release/webrtc_native_rceiver.exe` that has static assets built in.
+- Output is a single file `./target/release/webrtc_native_receiver.exe` that has static assets built in.
+
+### Additional Features
+- Statically bundles assets on release build both uncompressed and with brotli compression, serve the correct form.
+- Minify web assets with `parcel`
+- Typescript support for webpages (+demo)
+
+### WebRTC protocol
+Just sends/receives utf-8 strings. No length, no terminator. (Length inferred by packet size.)

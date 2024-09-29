@@ -21,7 +21,8 @@ pub async fn webserver_run(port: u16) {
     let socket = SocketAddr::from((WEBSERVER_HOST, port));
     let listener = tokio::net::TcpListener::bind(socket).await.unwrap();
     let server = axum::serve(listener, app);
-    info!("Webserver listening at {} (access: http://127.0.0.1:{}/)", socket, socket.port());
+    let localip = local_ip_address::local_ip().map(|x| x.to_string()).unwrap_or("?".into());
+    info!("Webserver listening at {} (localhost: http://127.0.0.1:{port}/, LAN: http://{}:{port}/)", socket, localip);
 
     async fn shutdown_detector(){ tokio::signal::ctrl_c().await.unwrap() }
     server
