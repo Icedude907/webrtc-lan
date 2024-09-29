@@ -11,6 +11,7 @@ async function connect(){
         // You can disable these by flipping these switches, making the connection UDP-like
         // maxRetransmits: 0, ordered: false,
     })
+    comm.binaryType = "arraybuffer";
     setupConectionHandlers(local, comm);
     // Do the connection
     let offer = await local.createOffer();
@@ -61,7 +62,7 @@ function setupConectionHandlers(peer: RTCPeerConnection, channel: RTCDataChannel
         }
     }
     // Data handler
-    channel.onmessage = ({data}) => {
+    channel.onmessage = ({data /*ArrayBuffer*/}) => {
         let msg = new TextDecoder("utf-8").decode(data);
         addToLog(msg);
     }

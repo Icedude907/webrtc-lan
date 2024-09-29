@@ -17,11 +17,11 @@ camera.position.z = 4;
 
 window.addEventListener("resize", () => {
   screenwidth = window.innerWidth
-  screenwidth = window.innerHeight
+  screenheight = window.innerHeight
   //update camera
-  camera.aspect = screenwidth / screenwidth
+  camera.aspect = screenwidth / screenheight
   camera.updateProjectionMatrix()
-  renderer.setSize(screenwidth, screenwidth)
+  renderer.setSize(screenwidth, screenheight)
 })
 
 // Create an empty scene

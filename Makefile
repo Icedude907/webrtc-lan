@@ -11,6 +11,8 @@
 default:
 	@echo "Use 'make release' to build release."
 
+# The touch makes sure rust rebuilds the binary assets into the file
 release:
 	cd webclient && pnpm build
+	touch src/webserver.rs
 	cargo build --release
