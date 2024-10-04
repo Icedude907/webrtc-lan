@@ -1,6 +1,6 @@
 use bytes::Bytes;
 use derive_new::new;
-use just_webrtc::{platform::{Channel, PeerConnection}, DataChannelExt};
+use just_webrtc::{platform::{Channel, PeerConnection}, types::PeerConnectionState, DataChannelExt, PeerConnectionExt};
 use just_webrtc::platform::Error as WebRTCError;
 use log::{info, trace, warn};
 use tokio::signal::ctrl_c;
@@ -18,11 +18,11 @@ pub struct ClientConnection{
 }
 
 impl ClientConnection{
-    pub async fn recv(&mut self)->Result<Bytes, WebRTCError>{
+    pub async fn recv(&self)->Result<Bytes, WebRTCError>{
         self.main_channel.receive().await
     }
     // usize = bytes sent
-    pub async fn send(&mut self, data: &Bytes)->Result<usize, WebRTCError>{
+    pub async fn send(&self, data: &Bytes)->Result<usize, WebRTCError>{
         self.main_channel.send(data).await
     }
     pub fn get_id(&self)->u64{ self.connection_id }
@@ -55,9 +55,25 @@ pub fn manage_connection(mut conn: ClientConnection){
                 },
                 Err(_)=>{ info!("Internal server error?"); break; }
             },
+            state = conn._peer.state_change() => match handle_connection_state_change(state, &conn){
+                Ok(_) => {},
+                Err(_) => { info!("Connection finished"); break }
+            },
             _exit = ctrl_c() => { break; }
         }}
         info!("Connection with {} has finished.", conn.get_connection_name());
         let _ = send2everyone.send(format!{">>> {} has left.", short_name});
     });
+}
+
+fn handle_connection_state_change(state: PeerConnectionState, conn: &ClientConnection) -> Result<(),()>{
+    use PeerConnectionState::*;
+    match state{
+        Failed => return Err(()),
+        Closed => return Err(()),
+        Connecting => info!("{} connecting...", conn.get_connection_name()),
+        Disconnected => info!("Connection interrupted with {}", conn.get_connection_name()),
+        _ => {}
+    }
+    return Ok(())
 }

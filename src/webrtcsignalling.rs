@@ -1,6 +1,6 @@
 use std::{sync::Mutex, time::Duration};
 
-use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
+use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, PeerConnectionState, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
 use lazy_static::lazy_static;
 use log::info;
 use serde::Serialize;
@@ -35,12 +35,22 @@ pub async fn create_offer(offer: SessionDescription, connectionsource: String) -
     return Ok(SessionTuple{description: answer, candidates});
 }
 
-pub async fn await_connection(mut peer: PeerConnection, connectionsource: &str)->Result<ClientConnection, ()>{
+// Must be used with a timeout
+async fn wait_is_connected(peer: &PeerConnection) -> Result<(),()>{
+    use PeerConnectionState::*;
+    loop{ match peer.state_change().await {
+        Failed => return Err(()),
+        Connected => return Ok(()),
+        _ => {}
+    }}
+}
+
+pub async fn await_connection(peer: PeerConnection, connectionsource: &str)->Result<ClientConnection, ()>{
     lazy_static!{
         static ref ID_GEN: Mutex<UUIDGen> = UUIDGen::new().into();
     }
 
-    let Ok(_) = tokio::time::timeout(REMOTE_CONNECTION_TIMEOUT, peer.wait_peer_connected()).await else {
+    let Ok(_) = tokio::time::timeout(REMOTE_CONNECTION_TIMEOUT, wait_is_connected(&peer)).await else {
         info!("Gave up on offer for {:?}", connectionsource);
         return Err(());
     };
