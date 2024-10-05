@@ -192,7 +192,7 @@ impl Decode for PktC2S_SendMsg{
 }
 impl Decode for PktC2S_SetName{
     fn decode(src: &mut Decoder) -> Result<Self, ()> {
-        let name = src.get_str()?;
+        let name = src.get_exhaustive_str();
         Ok(Self { name })
     }
 }

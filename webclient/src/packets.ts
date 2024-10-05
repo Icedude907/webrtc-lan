@@ -6,40 +6,93 @@ enum PktC2Sid{
     SetName = 2,
 }
 
-export function encode_C2S_Hello(cached_sid: Uint8Array | null): ArrayBuffer{
-    let length = 1;
-    if(cached_sid !== null){ length += 8; }
-    let buffer = new ArrayBuffer(length);
+// NOTE: Resiable ArrayBuffer is not avaliable enough to warrant using it in this code.
+// Nor is there an appopriate substitution for it at this time in the transpiler stages.
+// Safari iOS <= 16.3 is the big compatibility breaker. https://caniuse.com/mdn-javascript_builtins_arraybuffer_resize
+class PacketEncoder{
+    private buf = new ArrayBuffer(64);
+    private idx = 0;
 
-    let view = new Uint8Array(buffer);
-    view[0] = PktC2Sid.Hello;
-    if(cached_sid !== null){
-        view.set(cached_sid, 1);
+    constructor(){}
+    // Makes sure adding `amount` bytes to the buffer won't overflow.
+    private reserve_extra(amount: number){
+        let curcap = this.buf.byteLength;
+        let next = amount + this.idx;
+        if(next > curcap){ // Copy into new buffer
+            let newcap = next + Math.min(1024, next); // Double or add 1kb
+            let newbuf = new ArrayBuffer(newcap);
+            new Uint8Array(newbuf).set(new Uint8Array(this.buf));
+            this.buf = newbuf;
+        }
+    }
+    private view(){
+        return new Uint8Array(this.buf)
+    }
+    // Get a view over the packet that's the correct size for sending
+    public finish(){
+        return new DataView(this.buf, 0, this.idx)
     }
 
-    return buffer;
+    // Wraps
+    public append_u8(n: number){
+        this.reserve_extra(1);
+        this.view()[0] = n;
+        this.idx += 1;
+    }
+    public append_bytes(bytes: Uint8Array){
+        this.reserve_extra(bytes.length);
+        this.view().set(bytes);
+        this.idx += bytes.length;
+    }
+    // Truncates larger numbers than u28
+    public append_uvarint(num: number){
+        this.reserve_extra(4);
+        let view = this.view();
+        let n = 0;
+        for(let i = 0; i < 4; i++){
+            view[i] = num & 0x7f;
+            num >>= 7;
+            if(num !== 0){ view[i] |= 0x80 }
+            this.idx += 1;
+            if(num === 0){ break }
+        }
+    }
+    public append_str(dat: string){
+        let msg = new TextEncoder().encode(dat);
+        this.append_uvarint(msg.length);
+        this.reserve_extra(msg.length);
+        this.view().set(msg);
+        this.idx += msg.length;
+    }
+    public append_exhaustive_str(dat: string){
+        let msg = new TextEncoder().encode(dat);
+        this.reserve_extra(msg.length);
+        this.view().set(msg);
+        this.idx += msg.length;
+    }
 }
 
-export function encode_C2S_SendMsg(message: string): ArrayBuffer{
-    let length = 1;
-    let msg = new TextEncoder().encode(message);
-    length += msg.length;
-    let buffer = new ArrayBuffer(length);
-    let view = new Uint8Array(buffer);
-    view[0] = PktC2Sid.SendMsg;
-    view.set(msg, 1);
-    return buffer;
+export function encode_C2S_Hello(cached_sid: Uint8Array | null){
+    let enc = new PacketEncoder();
+    enc.append_u8(PktC2Sid.Hello);
+    if(cached_sid !== null){
+        enc.append_bytes(cached_sid);
+    }
+    return enc.finish();
 }
 
-export function encode_C2S_SetName(name: string): ArrayBuffer{
-    let length = 1;
-    let msg = new TextEncoder().encode(name);
-    length += msg.length;
-    let buffer = new ArrayBuffer(length);
-    let view = new Uint8Array(buffer);
-    view[0] = PktC2Sid.SetName;
-    view.set(msg, 1);
-    return buffer;
+export function encode_C2S_SendMsg(message: string){
+    let enc = new PacketEncoder();
+    enc.append_u8(PktC2Sid.SendMsg);
+    enc.append_exhaustive_str(message);
+    return enc.finish();
+}
+
+export function encode_C2S_SetName(name: string){
+    let enc = new PacketEncoder();
+    enc.append_u8(PktC2Sid.SetName);
+    enc.append_exhaustive_str(name);
+    return enc.finish();
 }
 
 

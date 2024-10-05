@@ -9,6 +9,12 @@ document.addEventListener('DOMContentLoaded', (_) => {
             submitMessage();
         }
     });
+    document.getElementById('usernameBox')!.addEventListener('keypress', (e)=>{
+        if (e.key === "Enter"){
+            e.preventDefault();
+            submitNameChange();
+        }
+    })
 })
 
 let sess: Session | undefined;
@@ -33,6 +39,9 @@ class Session{
 
     public send_message(message: string){
         this.conn.send(packet.encode_C2S_SendMsg(message));
+    }
+    public send_name_change(name: string){
+        this.conn.send(packet.encode_C2S_SetName(name));
     }
 
     private recv_packet(data: ArrayBuffer){
@@ -79,6 +88,11 @@ function submitMessage() {
     const inputBox = document.getElementById('inputBox')! as HTMLInputElement;
     sess?.send_message(inputBox.value);
     inputBox.value = '';
+}
+function submitNameChange(){
+    const inputBox = document.getElementById('usernameBox')! as HTMLInputElement;
+    sess?.send_name_change(inputBox.value);
+    inputBox.value = "...pending";
 }
 
 // The act of connecting to the server actually doesn't require the page to be finished loading.

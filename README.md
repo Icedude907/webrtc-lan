@@ -74,7 +74,7 @@ C2S (client to server)
 - `1`; Send message
     - `exhaustive_str` body
 - `2`; Set name
-    - `str` name
+    - `exhaustive_str` name
 - (webrtc close channel); End session
 
 S2C (server to client)
