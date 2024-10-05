@@ -1,7 +1,8 @@
 mod webserver;
 mod webrtcsignalling;
 mod webrtcpeer;
-mod chatsession;
+mod chatroom;
+mod packets;
 mod util;
 
 use log::{info, LevelFilter};
@@ -13,7 +14,13 @@ pub const WEBSERVER_PORT: u16 = 3000;
 
 #[tokio::main]
 async fn main(){
-    colog::basic_builder().filter_level(LevelFilter::Info).init();
+    colog::basic_builder()
+        .filter_level(LevelFilter::Info)
+        // .default_format()
+        // .format_timestamp(None)
+        // .format_module_path(true)
+        .filter_module("webrtc_ice", LevelFilter::Error)
+        .init();
 
     info!("Initialising");
     let _ = join!(

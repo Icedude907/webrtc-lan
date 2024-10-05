@@ -16,9 +16,12 @@ serde_json = "1.0.128"  # JSON for http/connect
 just-webrtc = "0.2"     # WebRTC communications
 
 bytes = "1.7.2"         # Util (networking)
-derive-new = "0.7.0"    # Util (macro)
+local-ip-address = "0.6.3" # Util (networking)
+derive_more = {version = "1.0.0", features = ["full"]}
+derive-new = "0.7.0"    # Util (proc-macro)
 lazy_static = "1.5.0"   # Util (macro)
-local-ip-address = "0.6.3"
+num-traits = "0.2.19"   # Util (num-derive dependency)
+num-derive = "0.4.2"    # Util (u8<->enum cast proc-macro)
 # rust-embed = "8.5.0"
 
 # anyhow = "1.0.89"
