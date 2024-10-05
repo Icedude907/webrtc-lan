@@ -1,91 +1,85 @@
-let comm: RTCDataChannel;
+import * as webrtc from "./webrtc"
+import * as packet from "./packets"
 
-// Connect to the WebRTC server
+// Requires the page to be loaded.
 document.addEventListener('DOMContentLoaded', (_) => {
-    connect();
-})
-async function connect(){
-    const local = new RTCPeerConnection()
-    comm = local.createDataChannel("c2s", {
-        // WebRTC is packet based but normally reliable+ordered in transmission
-        // You can disable these by flipping these switches, making the connection UDP-like
-        // maxRetransmits: 0, ordered: false,
-    })
-    comm.binaryType = "arraybuffer";
-    setupConectionHandlers(local, comm);
-    // Do the connection
-    let offer = await local.createOffer();
-    local.setLocalDescription(offer);
-    let response: {
-        description: RTCSessionDescriptionInit,
-        candidates: RTCIceCandidateInit[]
-    } = await exchange_connection_details(offer);
-    local.setRemoteDescription(response.description);
-    response.candidates.forEach(e => { local.addIceCandidate(e) });
-}
-// Detail exchange
-async function exchange_connection_details(offer: RTCSessionDescriptionInit){
-    let response = await fetch("/connect", {
-        method: "POST",
-        body: JSON.stringify(offer),
-        headers: { "Content-type": "application/json; charset=UTF-8" }
+    document.getElementById('inputBox')!.addEventListener('keypress', function(event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent the default action (form submission)
+            submitMessage();
+        }
     });
-    return await response.json();
+})
+
+let sess: Session | undefined;
+
+async function main(){
+    sess = new Session();
+    await sess.connect();
 }
-function setupConectionHandlers(peer: RTCPeerConnection, channel: RTCDataChannel){
-    // State handlers
-    channel.onopen  = () => setConnectionStatus("Chan Connected");
-    channel.onclose = () => {
-        setConnectionStatus("Chan Disconnected");
-        peer.close(); // If the channel is unexpectedly closed our connection is finished.
+
+class Session{
+    private conn: webrtc.WebRTCConnection;
+    private username: string;
+
+    constructor(){
+        this.conn = new webrtc.WebRTCConnection(this.on_connection_state_change, this.recv_packet);
+        this.username = "<connecting>";
     }
 
-    peer.onconnectionstatechange = (e) => {
-        const state = peer.connectionState;
+    public async connect(){
+        await this.conn.connect()
+    }
 
-        switch (state) {
-             case "new": case "connecting":
-                setConnectionStatus("Connecting...");
-                break;
-            case "connected":
-                setConnectionStatus("Connection established");
-                break;
-            case "disconnected":
-                setConnectionStatus("Connection interrupted. Attempting to re-establish...");
-                break;
-            case "failed":
-                setConnectionStatus("Connection finished (failed)");
-                break;
-            case "closed":
-                setConnectionStatus("Connection finished (closed)");
-                break;
+    public send_message(message: string){
+        this.conn.send(packet.encode_C2S_SendMsg(message));
+    }
+
+    private recv_packet(data: ArrayBuffer){
+        let _pkt = packet.decode_packet(data);
+        console.log(`Received packet: ${_pkt}`);
+        if(typeof _pkt === "string"){
+            console.log(`packet error: ${_pkt}`);
+            return;
+        }
+        let pkt = _pkt as (packet.PacketS2C & any);
+        if(pkt.id === packet.PktS2Cid.HelloReply){
+            console.log(`Hello reply: ${pkt}`);
+        }else if(pkt.id === packet.PktS2Cid.ReceiveMsg){
+            addToLog(pkt.msg);
+        }else if(pkt.id === packet.PktS2Cid.SetNameReply){
+            setUsernameText(pkt.username);
+        }else if(pkt.id === packet.PktS2Cid.LobbyInfo){
+            console.log(`Lobby info: ${pkt}`);
         }
     }
-    // Data handler
-    channel.onmessage = ({data /*ArrayBuffer*/}) => {
-        let msg = new TextDecoder("utf-8").decode(data);
-        addToLog(msg);
+
+    private on_connection_state_change(state: webrtc.ConnectionState){
+        setConnectionStatusText(webrtc.ConnectionState[state])
     }
 }
 
-function setConnectionStatus(status: string){
+function setConnectionStatusText(status: string){
     console.log(`Status -> ${status}`);
     document.getElementById("connectionStatus")!.innerText = status;
+}
+function setUsernameText(username: string){
+    let box = document.getElementById("usernameBox");
+    if(box == null) return;
+    (box as HTMLInputElement).value = username;
 }
 
 function addToLog(msg: string){
     const displayBox = document.getElementById('displayBox') as HTMLInputElement;
     displayBox.value += msg + '\n';
 }
+
 // Send messages
 function submitMessage() {
-    const inputBox = document.getElementById('inputBox') as HTMLInputElement;
-    comm.send(new TextEncoder().encode(inputBox.value));
+    const inputBox = document.getElementById('inputBox')! as HTMLInputElement;
+    sess?.send_message(inputBox.value);
     inputBox.value = '';
 }
-document.getElementById('inputBox')!.addEventListener('keypress', function(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault(); // Prevent the default action (form submission)
-        submitMessage();
-    }
-});
+
+// The act of connecting to the server actually doesn't require the page to be finished loading.
+main();

@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "parcel serve src/*.html",
+    "dev": "parcel serve --no-hmr src/*.html",
     "prebuild": "rimraf dist",
     "build": "parcel build src/*.html"
   },

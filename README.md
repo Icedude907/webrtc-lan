@@ -47,7 +47,7 @@ To build this project, you will need:
 
 #### Debug
 - `cargo run` will host the web server. Static pages will be served from `./webclient/dist` relative to working directory.
-- `pnpm build` will update the `dist` folder with your modified web files. This works as soon as you refresh the page (take care with client-side caching behaviour).
+- `pnpm dev` will run the parcel server in the background, automatically rebuilding the web pages as you change the source. Changes are visible as soon as you refresh the page (take care with client-side caching behaviour).
 
 #### Release building
 - `make release` or type the commands contained into your terminal
@@ -58,5 +58,34 @@ To build this project, you will need:
 - Minify web assets with `parcel`
 - Typescript support for webpages (+demo)
 
-### WebRTC protocol
-Just sends/receives utf-8 strings. No length, no terminator. (Length inferred by packet size.)
+### Protocol
+Packets are characterised by their direction, packet id (`u8`), and their length.
+
+Types:
+- `str`: `uvarint` length prefixed `utf8` encoded buffer
+- `uvarint`: Unsigned variable length integer. Little endian encoded, setting the top bit of the byte indicates more the next byte contains 7 more bits. Max length is 4 bytes -> 28 bits (top bit of last byte is ignored).
+- `sessionid`: 64 bits / `[8]u8`
+- `[]x`: `uvarint` length prefixed array of `x`.
+
+C2S (client to server)
+- `0`; Hello
+    - If contains a `sessionid` that's nonzero; Reintroduce
+- `1`; Send message
+    - `str` body
+- `2`; Set name
+    - `str` name
+- (webrtc close channel); End session
+
+S2C (server to client)
+- `0`; HelloReply
+    - Contains the new `sessionid` of the client.
+      The client caches their sessionid between connections.
+      If the sessionid returned by the server does not match the client's record, then the server does not recognise the client and a new session is starting
+    - Also contains your initial `str` username.
+- `1`; Receive message
+    - `str` body
+- `2`; Set name response
+    - `str` new name, or old name if the change was denied
+- `3`; Lobby info
+    - `[]str` Online users and their usernames
+       Sent to the client whenever someone enters, exits, or is lost from the lobby.

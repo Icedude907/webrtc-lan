@@ -15,24 +15,43 @@
             height: 200px;
             margin-bottom: 10px;
         }
-        #inputBox, #submitButton {
-            display: inline-block;
-            vertical-align: top;
-        }
         #inputBox {
             max-width: 44em;
             width: calc(100% - 100px);
         }
-        #submitButton {
+        .submitButton {
             width: 80px;
+        }
+        .editable-input {
+            border: 1px dashed #ccc;
+            padding: 5px;
+            outline: none;
+            width: 300px;
+        }
+        .flexboxleft {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
     </style>
 </head>
 <body>
     <h1 id="connectionStatus">Loading…</h1>
     <textarea id="displayBox" readonly value="" autocomplete="off"></textarea><br>
-    <input type="text" id="inputBox" placeholder="Write your message here">
-    <button id="submitButton" onclick="submitMessage()">Submit</button>
-    <script src="./index.ts"></script>
+
+    <div class="flexboxleft">
+        <input type="text" id="inputBox" placeholder="Write your message here">
+        <button class="submitButton" onclick="submitMessage()">Submit</button>
+    </div>
+
+    <div class="flexboxleft">
+        <h3>Chatting as</h3>
+        <input type="text" class="editable-input" id="usernameBox" value="&lt;Connecting&gt;" />
+        <button class="submitButton" onclick="submitNameChange()">Submit</button>
+    </div>
+
+    <h4>Lobby:</h4>
+
+    <script type="module" src="./index.ts"></script>
 </body>
 </html>
