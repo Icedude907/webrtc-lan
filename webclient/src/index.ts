@@ -24,7 +24,7 @@ class Session{
 
     constructor(){
         this.conn = new webrtc.WebRTCConnection(this.on_connection_state_change, this.recv_packet);
-        this.username = "<connecting>";
+        this.username = "";
     }
 
     public async connect(){

@@ -1,6 +1,6 @@
 // Encoding
 // ---------------
-enum PktC2S{
+enum PktC2Sid{
     Hello = 0,
     SendMsg = 1,
     SetName = 2,
@@ -12,7 +12,7 @@ export function encode_C2S_Hello(cached_sid: Uint8Array | null): ArrayBuffer{
     let buffer = new ArrayBuffer(length);
 
     let view = new Uint8Array(buffer);
-    view[0] = PktC2S.Hello;
+    view[0] = PktC2Sid.Hello;
     if(cached_sid !== null){
         view.set(cached_sid, 1);
     }
@@ -26,7 +26,7 @@ export function encode_C2S_SendMsg(message: string): ArrayBuffer{
     length += msg.length;
     let buffer = new ArrayBuffer(length);
     let view = new Uint8Array(buffer);
-    view[0] = PktC2S.SendMsg;
+    view[0] = PktC2Sid.SendMsg;
     view.set(msg, 1);
     return buffer;
 }
@@ -37,7 +37,7 @@ export function encode_C2S_SetName(name: string): ArrayBuffer{
     length += msg.length;
     let buffer = new ArrayBuffer(length);
     let view = new Uint8Array(buffer);
-    view[0] = PktC2S.SetName;
+    view[0] = PktC2Sid.SetName;
     view.set(msg, 1);
     return buffer;
 }

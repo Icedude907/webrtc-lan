@@ -62,7 +62,8 @@ To build this project, you will need:
 Packets are characterised by their direction, packet id (`u8`), and their length.
 
 Types:
-- `str`: `uvarint` length prefixed `utf8` encoded buffer
+- `str`: `uvarint` length (bytes), then `utf8` encoded buffer
+- `exhaustive_str` a `utf8` buffer that reads to the end of the packet.
 - `uvarint`: Unsigned variable length integer. Little endian encoded, setting the top bit of the byte indicates more the next byte contains 7 more bits. Max length is 4 bytes -> 28 bits (top bit of last byte is ignored).
 - `sessionid`: 64 bits / `[8]u8`
 - `[]x`: `uvarint` length prefixed array of `x`.
@@ -71,7 +72,7 @@ C2S (client to server)
 - `0`; Hello
     - If contains a `sessionid` that's nonzero; Reintroduce
 - `1`; Send message
-    - `str` body
+    - `exhaustive_str` body
 - `2`; Set name
     - `str` name
 - (webrtc close channel); End session
