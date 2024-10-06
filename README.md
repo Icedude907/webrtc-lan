@@ -82,7 +82,7 @@ S2C (server to client)
     - Contains the new `sessionid` of the client.
       The client caches their sessionid between connections.
       If the sessionid returned by the server does not match the client's record, then the server does not recognise the client and a new session is starting
-    - Also contains your initial `str` username.
+    - Also contains your initial `exhaustive_str` username.
 - `1`; Receive message
     - `str` body
 - `2`; Set name response

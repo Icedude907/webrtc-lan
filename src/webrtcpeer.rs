@@ -2,95 +2,65 @@ use bytes::Bytes;
 use derive_new::new;
 use just_webrtc::{platform::{Channel, PeerConnection}, types::PeerConnectionState, DataChannelExt, PeerConnectionExt};
 use just_webrtc::platform::Error as WebRTCError;
-use log::{info, warn};
+use log::info;
 use tokio::signal::ctrl_c;
+use packets::{PktC2S, PktS2C_HelloReply};
 
-use crate::{chatroom::CHAT, packets::{self, Encode}};
+use crate::{packets::{self, Encode}, usersession::ActiveSession};
 
 /// Abstracts the WebRTC peer under a pseudo-"protocol" of unordered+unreliable or ordered+reliable streams
-/// The reliable streams are for status and game graphics
-/// The unreliable stream is for the client's inputs with the server
+/// The reliable streams are for status and data transfer
+/// The unreliable stream is for rapidly changing info e.g.: keypresses, rng seeds
 #[derive(new)]
 pub struct ClientConnection{
     _peer: PeerConnection,
-    main_channel: Channel,
-    connection_id: u64,
+    _chan: Channel,
+    // connection_id: u64,
+}
+
+pub enum RecvError{
+    Abort,
+    WebRTCError(WebRTCError),
 }
 
 impl ClientConnection{
-    pub async fn recv(&self)->Result<Bytes, WebRTCError>{
-        self.main_channel.receive().await
+    pub async fn recv(&self)->Result<Bytes, RecvError>{
+        use RecvError::*;
+        tokio::select!{
+            x = self._chan.receive() => { return x.map_err(|e|WebRTCError(e)); },
+            _ = ctrl_c() => { return Err(Abort); }
+        }
     }
     // usize = bytes sent
     pub async fn send(&self, data: Bytes)->Result<usize, WebRTCError>{
-        self.main_channel.send(&data).await
+        info!("{} >> {:?}", "Out", data);
+        self._chan.send(&data).await
     }
-    pub fn get_id(&self)->u64{ self.connection_id }
-    pub fn get_connection_name(&self)->String{ format!("{:016X}", self.connection_id) }
+    pub async fn state_change(&self)->PeerConnectionState{
+        self._peer.state_change().await
+    }
+    // pub fn get_id(&self)->u64{ self.connection_id }
+    // pub fn get_connection_name(&self)->String{ format!("{:016X}", self.connection_id) }
 }
 
-pub fn manage_connection(mut conn: ClientConnection){
-    tokio::spawn(async move{
-        let short_name = format!("*{:04X}", conn.get_id() % 0x10000);
-        let (mut broadcast, send2everyone) = CHAT.lock().unwrap().join(&short_name);
-        // TODO: How to close the connection (without waiting for a failed send / manually implementing timeouts?)
+/// Awaiting this function will block until the connection is closed.
+pub async fn manage_connection(conn: ClientConnection){
+    // Step 1: Client needs to send a Hello message to introduce itself.
+    // Anything else breaks the link.
+    let Some(msg) = conn.recv().await
+        .ok() // Received a message (e.g.: connection didn't fail)
+        .and_then(|x| packets::decode(x.to_vec()).ok()) // Was a valid packet
+        .and_then(|x| match x { PktC2S::Hello(p) => Some(p), _ => None }) // Was Hello
+        else { info!("Drop"); return; /* TODO: drop closes? */ };
 
-        let handle_incoming = |msg: Bytes|->_{
-            use packets::PktC2S::*;
-            info!("{} >> {:?}", conn.get_connection_name(), msg);
-            let Ok(pkt) = packets::decode(msg.to_vec()) else { warn!("{} connection error", conn.get_connection_name()); return Err(())};
-            info!("\t{:?}", pkt);
-            match pkt{
-                SendMsg(p)=>{
-                    // let msg = format!("{}: {}", short_name, String::from_utf8_lossy(&msg));
-                    let Ok(_) = send2everyone.send(p.msg) else {return Err(())};
-                }
-                _ => {},
-            }
-            return Ok(())
-        };
-        let handle_outgoing = |msg: String|->_{
-            let msg = packets::PktS2C_ReceiveMsg::new(msg).encode();
-            let bytes = msg.into();
-            info!("{} << {:?}", conn.get_connection_name(), bytes);
-            conn.send(bytes)
-        };
+    // Step 2: We create a session
+    // TODO: SessionId session recovery
+    let session = ActiveSession::new(conn);
 
-        loop{tokio::select! {
-            c2s = conn.recv() => match c2s{
-                // Receive data
-                Ok(msg)=>{handle_incoming(msg);},
-                // Connection shutdown
-                Err(_)=>{ warn!("Unexpected error. Closing connection."); break; }
-            },
-            s2c = broadcast.recv() => match s2c{
-                Ok(msg)=>{
-                    match handle_outgoing(msg).await {
-                        Ok(_) => {},
-                        Err(x) => { warn!("Error: Could not send to client {}", x); break; }
-                    }
-                },
-                Err(_)=>{ info!("Internal server error?"); break; }
-            },
-            state = conn._peer.state_change() => match handle_connection_state_change(state, &conn){
-                Ok(_) => {},
-                Err(_) => { info!("Connection finished"); break }
-            },
-            _exit = ctrl_c() => { break; }
-        }}
-        info!("Connection with {} has finished.", conn.get_connection_name());
-        let _ = send2everyone.send(format!{">>> {} has left.", short_name});
-    });
-}
+    // Step 3: We send HelloReply
+    let reply = PktS2C_HelloReply::new(session.user.id, session.user.username.clone());
+    let Ok(_) = session.send(reply.encode().into()).await else { info!("Drop"); return; };
 
-fn handle_connection_state_change(state: PeerConnectionState, conn: &ClientConnection) -> Result<(),()>{
-    use PeerConnectionState::*;
-    match state{
-        Failed => return Err(()),
-        Closed => return Err(()),
-        Connecting => info!("{} connecting...", conn.get_connection_name()),
-        Disconnected => info!("Connection interrupted with {}", conn.get_connection_name()),
-        _ => {}
-    }
-    return Ok(())
+    // Step 4: We defer to the session handler
+    session.handle_active_session().await;
 }

@@ -3,6 +3,7 @@ mod webrtcsignalling;
 mod webrtcpeer;
 mod chatroom;
 mod packets;
+mod usersession;
 mod util;
 
 use log::{info, LevelFilter};

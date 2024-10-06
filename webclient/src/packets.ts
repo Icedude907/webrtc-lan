@@ -25,8 +25,9 @@ class PacketEncoder{
             this.buf = newbuf;
         }
     }
+    // Creates a view starting from the current position in the writer
     private view(){
-        return new Uint8Array(this.buf)
+        return new Uint8Array(this.buf, this.idx)
     }
     // Get a view over the packet that's the correct size for sending
     public finish(){
@@ -66,9 +67,9 @@ class PacketEncoder{
     }
     public append_exhaustive_str(dat: string){
         let msg = new TextEncoder().encode(dat);
-        this.reserve_extra(msg.length);
+        this.reserve_extra(msg.byteLength);
         this.view().set(msg);
-        this.idx += msg.length;
+        this.idx += msg.byteLength;
     }
 }
 
@@ -112,6 +113,7 @@ export interface PacketS2C{
 
 type PktS2C_HelloReply = PktS2C_SetNameReply & {
     sid: Uint8Array,
+    username: string,
 }
 type PktS2C_ReceiveMsg = {
     msg: string,
@@ -143,8 +145,9 @@ class PktDecoder{
         return value;
     }
     public get_bytes(count: number): Uint8Array{
+        let value = new Uint8Array(this.view.buffer, this.ofs, count);
         this.ofs += count;
-        return new Uint8Array(this.view.buffer, this.ofs, count);
+        return value;
     }
 
     public get_uvarint(): number {
@@ -160,11 +163,18 @@ class PktDecoder{
         }
         return val;
     }
-    public get_str(): string {
-        let length = this.get_uvarint();
-        const stringBytes = new Uint8Array(this.view.buffer, this.ofs, length);
+    public get_str_len(len: number): string{
+        const stringBytes = new Uint8Array(this.view.buffer, this.ofs, len);
         this.ofs += length;
         return new TextDecoder('utf-8').decode(stringBytes);
+    }
+    public get_str(){
+        let length = this.get_uvarint();
+        return this.get_str_len(length);
+    }
+    public get_str_exhaustive(){
+        let length = this.view.byteLength - this.offset;
+        return this.get_str_len(length);
     }
     public get_arr<T>(reader: (decoder: PktDecoder)=>T): T[]{
         let length = this.get_uvarint();
@@ -205,7 +215,7 @@ let decode_unimplemented: DecoderFunction = (_)=>ParseError.Unimplemented;
 let decode_S2C_HelloReply: DecoderFunction<PktS2C_HelloReply> = (d)=>{
     return {
         sid: d.get_sessionid(),
-        username: d.get_str(),
+        username: d.get_str_exhaustive(),
     };
 }
 let decode_S2C_ReceiveMsg: DecoderFunction<PktS2C_ReceiveMsg> = (d)=>{

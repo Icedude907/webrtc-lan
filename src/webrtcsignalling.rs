@@ -1,11 +1,10 @@
-use std::{sync::Mutex, time::Duration};
+use std::time::Duration;
 
 use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, PeerConnectionState, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
-use lazy_static::lazy_static;
 use log::info;
 use serde::Serialize;
 
-use crate::{util::UUIDGen, webrtcpeer, ClientConnection};
+use crate::{webrtcpeer, ClientConnection};
 
 #[derive(Serialize)]
 pub struct SessionTuple{
@@ -16,7 +15,7 @@ pub struct SessionTuple{
 const REMOTE_CONNECTION_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub async fn create_offer(offer: SessionDescription, connectionsource: String) -> Result<SessionTuple, ()>{
-    let Ok(mut remote_peer_connection) = PeerConnectionBuilder::new()
+    let Ok(remote_peer_connection) = PeerConnectionBuilder::new()
         .set_config(PeerConfiguration{..Default::default()})
         .with_remote_offer(Some(offer)).map_err(|_|())?
         .build().await else{ return Err(()) };
@@ -28,8 +27,8 @@ pub async fn create_offer(offer: SessionDescription, connectionsource: String) -
     info!("Hosting offer for {:?}", connectionsource);
     tokio::spawn(async move{
         if let Ok(conn) = await_connection(remote_peer_connection, &connectionsource).await {
-            info!("WebRTC established with {:?} as {}", connectionsource, conn.get_connection_name());
-            webrtcpeer::manage_connection(conn);
+            info!("WebRTC established with {:?}", connectionsource);
+            webrtcpeer::manage_connection(conn).await;
         }
     });
     return Ok(SessionTuple{description: answer, candidates});
@@ -46,10 +45,6 @@ async fn wait_is_connected(peer: &PeerConnection) -> Result<(),()>{
 }
 
 pub async fn await_connection(peer: PeerConnection, connectionsource: &str)->Result<ClientConnection, ()>{
-    lazy_static!{
-        static ref ID_GEN: Mutex<UUIDGen> = UUIDGen::new().into();
-    }
-
     let Ok(_) = tokio::time::timeout(REMOTE_CONNECTION_TIMEOUT, wait_is_connected(&peer)).await else {
         info!("Gave up on offer for {:?}", connectionsource);
         return Err(());
@@ -58,8 +53,6 @@ pub async fn await_connection(peer: PeerConnection, connectionsource: &str)->Res
     let remote_channel = peer.receive_channel().await.unwrap();
     remote_channel.wait_ready().await;
 
-    let connection_id = ID_GEN.lock().unwrap().next(); // This is sound. Lock is freed after expression, and async can't interrupt so async secure. Thread safety is guaranteed by mutex.
-
-    let conn = ClientConnection::new(peer, remote_channel, connection_id);
+    let conn = ClientConnection::new(peer, remote_channel);
     return Ok(conn);
 }

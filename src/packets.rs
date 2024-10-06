@@ -8,6 +8,8 @@ use derive_new::new;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 
+use crate::usersession::SessionId;
+
 // TODO: Improve networking ergonomics
 // pub poison is big sad
 // lots of boilerplates and results
@@ -47,7 +49,7 @@ enum PktS2C{
     SetNameReply(PktS2C_SetNameReply),
     LobbyInfo(PktS2C_LobbyInfo)
 }
-#[derive(new)] pub struct PktS2C_HelloReply{sid: SessionId}
+#[derive(new)] pub struct PktS2C_HelloReply{sid: SessionId, username: String}
 #[derive(new)] pub struct PktS2C_ReceiveMsg{msg: String}
 #[derive(new)] pub struct PktS2C_SetNameReply{name: String}
 #[derive(new)] pub struct PktS2C_LobbyInfo{users: Vec<String>}
@@ -68,7 +70,6 @@ struct Decoder{
     idx: usize,
 }
 type R<T> = Result<T, ()>;
-#[derive(Debug)] struct SessionId([u8; 8]);
 impl Decoder{
     // Associate
     // use self::SessionId;
@@ -132,7 +133,7 @@ impl Decoder{
         return Ok(vec);
     }
     pub fn get_sessionid(&mut self)->R<SessionId>{
-        return self.get_bytes_const::<8>().map(|x| SessionId(x));
+        return self.get_bytes_const::<8>().map(|x| SessionId(u64::from_le_bytes(x)));
     }
 }
 
@@ -173,7 +174,7 @@ impl Encoder{
         self.buf.write(dat.as_bytes());
     }
     fn append_sessionid(&mut self, dat: SessionId){
-        self.append_bytes(&dat.0);
+        self.append_bytes(&dat.0.to_le_bytes());
     }
 }
 
@@ -201,6 +202,7 @@ impl Encode for PktS2C_HelloReply{
         let mut enc = Encoder::new();
         enc.append_u8(PktS2Cid::HelloReply as u8);
         enc.append_sessionid(self.sid);
+        enc.append_exhaustive_str(&self.username);
         return enc.consume();
     }
 }

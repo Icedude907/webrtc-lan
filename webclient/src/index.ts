@@ -27,14 +27,18 @@ async function main(){
 class Session{
     private conn: webrtc.WebRTCConnection;
     private username: string;
+    private sessionid: Uint8Array|null;
 
     constructor(){
         this.conn = new webrtc.WebRTCConnection(this.on_connection_state_change, this.recv_packet);
         this.username = "";
+        this.sessionid = null;
     }
 
     public async connect(){
         await this.conn.connect()
+        // send Hello
+        this.conn.send(packet.encode_C2S_Hello(null))
     }
 
     public send_message(message: string){
@@ -44,20 +48,22 @@ class Session{
         this.conn.send(packet.encode_C2S_SetName(name));
     }
 
-    private recv_packet(data: ArrayBuffer){
+    // Arrow function inherits this, but regular function does not. WHAT
+    private recv_packet = (data: ArrayBuffer)=>{
         let _pkt = packet.decode_packet(data);
-        console.log(`Received packet: ${_pkt}`);
+        console.log(`Received packet: ${JSON.stringify(_pkt)}`);
         if(typeof _pkt === "string"){
             console.log(`packet error: ${_pkt}`);
             return;
         }
         let pkt = _pkt as (packet.PacketS2C & any);
         if(pkt.id === packet.PktS2Cid.HelloReply){
-            console.log(`Hello reply: ${pkt}`);
+            this.sessionid = pkt.sid;
+            this.set_username(pkt.username)
         }else if(pkt.id === packet.PktS2Cid.ReceiveMsg){
             addToLog(pkt.msg);
         }else if(pkt.id === packet.PktS2Cid.SetNameReply){
-            setUsernameText(pkt.username);
+            this.set_username(pkt.username);
         }else if(pkt.id === packet.PktS2Cid.LobbyInfo){
             console.log(`Lobby info: ${pkt}`);
         }
@@ -65,6 +71,10 @@ class Session{
 
     private on_connection_state_change(state: webrtc.ConnectionState){
         setConnectionStatusText(webrtc.ConnectionState[state])
+    }
+    private set_username(username: string){
+        this.username = username;
+        setUsernameText(username);
     }
 }
 

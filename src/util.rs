@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 
 /// Crude sequence generator
 /// Linear congruent with Hull-Dobel theorem
@@ -6,15 +8,20 @@ pub struct UUIDGen{
     prev: u64
 }
 impl UUIDGen{
-    pub fn new()->Self{
-        Self { prev: 0x4A4F6E6F47B24E5A }
+    pub fn new(seed: u64)->Self{
+        Self { prev: seed ^ 0x1234567890ABCDEF } // Sugar it a bit
     }
+    pub fn new_now()->Self{ Self::new(get_time_millis()) }
     pub fn next(&mut self) -> u64{
-        let a = 2023;
-        let c = 2025;
-        self.prev = self.prev.wrapping_mul(a).wrapping_add(c);
+        const A: u64 = 8388356123327754055;
+        const C: u64 = 1; // If C is 1 I think that satisfies all conditions
+        self.prev = self.prev.wrapping_mul(A).wrapping_add(C);
         return self.prev;
     }
+}
+
+pub fn get_time_millis()->u64{
+    SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis() as u64
 }
 
 #[macro_export]
