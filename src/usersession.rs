@@ -28,7 +28,12 @@ impl ActiveSession{
         loop{tokio::select! {
             c2s = self.conn.recv() => match c2s{
                 // Receive data
-                Ok(msg)=>{self.handle_incoming(msg, &handle).await;},
+                Ok(msg)=>{
+                    match self.handle_incoming(msg, &handle).await{
+                        Err(_) => break,
+                        _ => {},
+                    };
+                },
                 // Connection shutdown
                 Err(RecvError::Abort)=>{ break; }
                 Err(_)=>{ warn!("Unexpected error. Closing connection."); break; }
@@ -85,6 +90,9 @@ impl ActiveSession{
                     let _ = LOBBY.broadcast_tx.send(ParticipantMsg::Message(Server(announcement)));
                     self.user.username = p.name;
                 }
+            }
+            Goodbye(_)=>{
+                return Err(());
             }
             _ => {},
         }

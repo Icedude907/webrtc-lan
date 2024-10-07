@@ -37,6 +37,16 @@ There's been talk of a Raw UDP socket api for the web which, when abstracted ove
 
 <!-- TODO: What I wanted, what I needed, what I got -->
 
+#### Handling disconnects
+When a client/browser calls `WebRTCPeerConnection.close()`, they seemingly close their socket unceremoniously without telling the server.
+This is tantamount to a network-related disconnect (e.g.: due to poor wifi).
+
+This means our protocol needs to build in a graceful exit mechanism (see below).
+
+Currently, the server will recognise network-related disconnects as end-of-session. This is subject to change.
+1. It tries to send a packet but the channel is closed
+2. The WebRTC connection status swaps to 'failed'
+
 -----
 
 ## Build
@@ -75,7 +85,7 @@ C2S (client to server)
     - `exhaustive_str` body
 - `2`; Set name
     - `exhaustive_str` name
-- (webrtc close channel); End session
+- `3`; Goodbye. Ends the existing session
 
 S2C (server to client)
 - `0`; HelloReply

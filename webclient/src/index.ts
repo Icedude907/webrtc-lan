@@ -16,6 +16,10 @@ document.addEventListener('DOMContentLoaded', (_) => {
         }
     })
 })
+// Destroys the webrtc connection, rather than having to wait for a timeout event on the server side.
+window.addEventListener('beforeunload', (_)=>{
+    sess?.shutdown();
+})
 
 let sess: Session | undefined;
 
@@ -38,7 +42,13 @@ class Session{
     public async connect(){
         await this.conn.connect()
         // send Hello
-        this.conn.send(packet.encode_C2S_Hello(null))
+        this.conn.send(packet.encode_C2S_Hello(null));
+    }
+    // Destroy the connection and the session on page close
+    public shutdown(){
+        this.conn.send(packet.encode_C2S_Goodbye());
+        this.conn.disconnect();
+        sess = undefined;
     }
 
     public send_message(message: string){

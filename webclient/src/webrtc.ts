@@ -58,6 +58,11 @@ export class WebRTCConnection{
         await new Promise<void>((resolve, reject)=>this.data.onopen = ()=>resolve())
     }
 
+    public disconnect(){
+        this.data.close();
+        this.peer.close();
+    }
+
     // Dataview is apparently safe https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/send
     public send(data: Blob|ArrayBuffer|DataView){
         this.data.send(data as any);

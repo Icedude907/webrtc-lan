@@ -4,6 +4,7 @@ enum PktC2Sid{
     Hello = 0,
     SendMsg = 1,
     SetName = 2,
+    Goodbye = 3,
 }
 
 // NOTE: Resiable ArrayBuffer is not avaliable enough to warrant using it in this code.
@@ -96,6 +97,11 @@ export function encode_C2S_SetName(name: string){
     return enc.finish();
 }
 
+export function encode_C2S_Goodbye(){
+    let enc = new PacketEncoder();
+    enc.append_u8(PktC2Sid.Goodbye);
+    return enc.finish();
+}
 
 // Decoding
 // ---------------
