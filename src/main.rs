@@ -6,7 +6,6 @@ mod packets;
 mod usersession;
 mod util;
 
-use chatroom::{Lobby, LOBBY};
 use log::{info, LevelFilter};
 use tokio::join;
 use webrtcpeer::ClientConnection;

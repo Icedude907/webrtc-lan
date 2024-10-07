@@ -1,40 +1,9 @@
-use std::{cell::LazyCell, collections::{HashMap, HashSet}, mem::{ManuallyDrop, MaybeUninit}, ops::DerefMut, sync::{Arc, LazyLock, Mutex, Weak}};
-use derive_more::derive::DerefMut;
+use std::collections::HashMap;
 use lazy_static::lazy_static;
 use log::{info, warn};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
 use crate::{packets::{self, Encode}, usersession::{ActiveSession, SessionId}};
-
-// lazy_static!{
-//     pub static ref CHAT: Mutex<ChatRoom> = Mutex::new(ChatRoom::new());
-// }
-
-// type Message = String;
-
-// /// Represents the active chat room
-// pub struct ChatRoom{
-//     // log: Vec<String>,
-//     broadcast_tx: broadcast::Sender<Message>,
-// }
-// impl ChatRoom{
-//     pub fn new()->Self{
-//         let (broadcast_tx, _) = broadcast::channel(100);
-//         Self { broadcast_tx }
-//     }
-//     // Returns a receiver that contains other participant messages
-//     // And a sender that can be used to push your messages out.
-//     pub fn add_participant(&mut self, joininfo: &String)->(broadcast::Receiver<Message>, broadcast::Sender<Message>){
-//         let broadcast_tx = self.broadcast_tx.clone();
-//         let broadcast_rx = broadcast_tx.subscribe();
-//         // Announce new participant
-//         let _ = self.broadcast_tx.send(format!(">>> {} joined.", joininfo));
-
-//         return (broadcast_rx, broadcast_tx);
-//     }
-// }
-
-// ----------------
 
 #[derive(Clone)]
 pub enum ChatMsg{
@@ -111,16 +80,16 @@ impl Lobby{
         return handle;
     }
     // Removes a member & broadcasts the new lobby participant table
-    pub async fn remove(&self, handle: LobbyHandle){
-        let Some(x) = self.sync.write().await.members.remove(&handle.sessionid) else {
-            warn!("Attempt to remove non-existent session {} from the lobby", handle.sessionid);
+    pub async fn remove(&self, sessionid: SessionId){
+        let Some(x) = self.sync.write().await.members.remove(&sessionid) else {
+            warn!("Attempt to remove non-existent session {} from the lobby", sessionid);
             return;
         };
 
         let announcement = format!(">>> {} has left.", "<TODO: Usename>");
         self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
-        info!("Removed session {}", handle.sessionid);
+        info!("Removed session {}", sessionid);
         self.update_lobby_participants().await;
     }
     // Broadcasts a list of lobby participants to all clients
@@ -134,15 +103,12 @@ impl Lobby{
         self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
     }
 }
-// impl std::ops::Drop for LobbyHandle{
-//     // Leaves the lobby
-//     fn drop(&mut self) {
-//         let this = ManuallyDrop::new(std::mem::take(self));
-//         let x = *self;
-//         tokio::spawn(async move{
-//             LOBBY.remove(x).await;
-//             std::mem::forget(x);
-//         });
-//         std::mem::forget(this);
-//     }
-// }
+impl std::ops::Drop for LobbyHandle{
+    // Leaves the lobby
+    fn drop(&mut self) {
+        let sid = self.sessionid;
+        tokio::spawn(async move{
+            LOBBY.remove(sid).await;
+        });
+    }
+}

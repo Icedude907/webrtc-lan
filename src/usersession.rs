@@ -1,11 +1,10 @@
-use std::{borrow::Borrow, sync::Mutex};
+use std::sync::Mutex;
 
 use bytes::Bytes;
 use derive_more::derive::{Deref, Display};
 use just_webrtc::types::PeerConnectionState;
 use lazy_static::lazy_static;
 use log::{info, warn};
-use tokio::sync::broadcast;
 
 use crate::{chatroom::{LobbyHandle, ParticipantMsg, LOBBY}, packets::{self, Encode}, util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}};
 
@@ -53,7 +52,6 @@ impl ActiveSession{
             },
         }}
         info!("Connection with {} has finished.", self.user.username);
-        LOBBY.remove(handle).await; // FIXME: move to a destructor?
     }
     fn handle_connection_state_change(&self, state: PeerConnectionState) -> Result<(),()>{
         use PeerConnectionState::*;
