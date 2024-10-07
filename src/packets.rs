@@ -150,10 +150,10 @@ impl Encoder{
         self.buf.into_inner()
     }
     fn append_u8(&mut self, dat: u8){
-        self.buf.write(&[dat]);
+        let _ = self.buf.write(&[dat]);
     }
     fn append_bytes(&mut self, dat: &[u8]){
-        self.buf.write(dat);
+        let _ = self.buf.write(dat);
     }
     // Uvarints are 28 bits wide.
     fn append_uvarint(&mut self, dat: u32){
@@ -162,16 +162,16 @@ impl Encoder{
             let mut tmp = dat as u8 & 0x7f;
             dat >>= 7;
             if dat != 0 { tmp |= 0x80; }
-            self.buf.write(&[tmp]);
+            self.append_u8(tmp);
             if dat == 0 { break; }
         }
     }
     fn append_str(&mut self, dat: &str){
         self.append_uvarint(dat.len() as u32);
-        self.buf.write(dat.as_bytes());
+        self.append_bytes(dat.as_bytes());
     }
     fn append_exhaustive_str(&mut self, dat: &str){
-        self.buf.write(dat.as_bytes());
+        self.append_bytes(dat.as_bytes());
     }
     fn append_sessionid(&mut self, dat: SessionId){
         self.append_bytes(&dat.0.to_le_bytes());

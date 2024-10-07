@@ -46,11 +46,17 @@
 
     <div class="flexboxleft">
         <h3>Chatting as</h3>
-        <input type="text" class="editable-input" id="usernameBox" value="(Usernames unimplemented)" />
-        <button class="submitButton" onclick="submitNameChange()">Submit</button>
+        <input type="text" class="editable-input" id="usernameBox" value="...connecting" />
+        <button class="submitButton" onclick="submitNameChange()">Change</button>
     </div>
 
-    <h4>Lobby:</h4>
+    <table id="lobby">
+        <thead>
+            <tr>
+                <th><h4>Lobby:</h4></th>
+        </tr></thead>
+        <tbody></tbody>
+    </table>
 
     <script type="module" src="./index.ts"></script>
 </body>

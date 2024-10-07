@@ -1,31 +1,148 @@
-use std::sync::Mutex;
+use std::{cell::LazyCell, collections::{HashMap, HashSet}, mem::{ManuallyDrop, MaybeUninit}, ops::DerefMut, sync::{Arc, LazyLock, Mutex, Weak}};
+use derive_more::derive::DerefMut;
 use lazy_static::lazy_static;
-use tokio::sync::broadcast;
+use log::{info, warn};
+use tokio::sync::{broadcast, mpsc, RwLock};
 
+use crate::{packets::{self, Encode}, usersession::{ActiveSession, SessionId}};
+
+// lazy_static!{
+//     pub static ref CHAT: Mutex<ChatRoom> = Mutex::new(ChatRoom::new());
+// }
+
+// type Message = String;
+
+// /// Represents the active chat room
+// pub struct ChatRoom{
+//     // log: Vec<String>,
+//     broadcast_tx: broadcast::Sender<Message>,
+// }
+// impl ChatRoom{
+//     pub fn new()->Self{
+//         let (broadcast_tx, _) = broadcast::channel(100);
+//         Self { broadcast_tx }
+//     }
+//     // Returns a receiver that contains other participant messages
+//     // And a sender that can be used to push your messages out.
+//     pub fn add_participant(&mut self, joininfo: &String)->(broadcast::Receiver<Message>, broadcast::Sender<Message>){
+//         let broadcast_tx = self.broadcast_tx.clone();
+//         let broadcast_rx = broadcast_tx.subscribe();
+//         // Announce new participant
+//         let _ = self.broadcast_tx.send(format!(">>> {} joined.", joininfo));
+
+//         return (broadcast_rx, broadcast_tx);
+//     }
+// }
+
+// ----------------
+
+#[derive(Clone)]
+pub enum ChatMsg{
+    User(String),
+    Server(String),
+}
+#[derive(Clone)]
+pub enum ParticipantMsg{
+    Message(ChatMsg),
+    RawPacket(Vec<u8>)
+}
+#[derive(Clone)]
+pub struct LobbyInfo{
+    members: Vec<String>
+}
+
+// Global lobby
 lazy_static!{
-    pub static ref CHAT: Mutex<ChatRoom> = Mutex::new(ChatRoom::new());
+    pub static ref LOBBY: Lobby = Lobby::new();
 }
 
-type Message = String;
-
-/// Represents the active chat room
-pub struct ChatRoom{
-    // log: Vec<String>,
-    broadcast_tx: broadcast::Sender<Message>,
+/// Represents the chat lobby
+pub struct Lobby{
+    sync: RwLock<LobbySync>,
+    pub broadcast_tx: broadcast::Sender<ParticipantMsg>,
 }
-impl ChatRoom{
+unsafe impl Sync for Lobby{}
+/// Contains the parts of the chat that must be synchronised in their modification
+pub struct LobbySync{
+    log: Vec<ChatMsg>,
+    // Maps client session ids with their individual send channel - used so the lobby can send directly to a single person (e.g.: Name changes)
+    members: HashMap<SessionId, mpsc::Sender<ParticipantMsg>>,
+}
+/// A client's handle to the lobby.
+/// Destroying this is equivalent to exiting the lobby.
+pub struct LobbyHandle{
+    pub broadcast_rx: broadcast::Receiver<ParticipantMsg>,
+    pub individual_rx: mpsc::Receiver<ParticipantMsg>,
+    // The session associated with this handle.
+    sessionid: SessionId
+}
+
+//
+impl Lobby{
     pub fn new()->Self{
-        let (broadcast_tx, _) = broadcast::channel(100);
-        Self { broadcast_tx }
+        let (tx, _ ) = broadcast::channel(64);
+        Self {
+            sync: RwLock::new(LobbySync {
+                log: vec![],
+                members: HashMap::new()
+            }),
+            broadcast_tx: tx
+        }
     }
-    // Returns a receiver that contains other participant messages
-    // And a sender that can be used to push your messages out.
-    pub fn add_participant(&mut self, joininfo: &String)->(broadcast::Receiver<Message>, broadcast::Sender<Message>){
-        let broadcast_tx = self.broadcast_tx.clone();
-        let broadcast_rx = broadcast_tx.subscribe();
-        // Announce new participant
-        let _ = self.broadcast_tx.send(format!(">>> {} joined.", joininfo));
+    // Joins the lobby.
+    // Registers the sessionid in the lobby struct, and returns a handle that receives both broadcast and individual messages.
+    // For a lobby participant to send to the lobby, access through the global LOBBY
+    pub async fn join(&self, session: &ActiveSession)->LobbyHandle{
+        // Send a join message to all other participants
+        let announcement = format!(">>> {} has joined", session.user.username);
+        self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
-        return (broadcast_rx, broadcast_tx);
+        // Create the lobby handle
+        let broadcast_rx = self.broadcast_tx.subscribe();
+        let (individual_tx, individual_rx) = mpsc::channel(64);
+                // Send welcome
+                let welcome = format!(">>> Welcome, {}.", session.user.username);
+                individual_tx.send(ParticipantMsg::Message(ChatMsg::Server(welcome))).await;
+        self.sync.write().await.members.insert(session.user.id, individual_tx);
+        let handle = LobbyHandle{ broadcast_rx, individual_rx, sessionid: session.user.id };
+
+        // update_participants
+        self.update_lobby_participants().await;
+        return handle;
+    }
+    // Removes a member & broadcasts the new lobby participant table
+    pub async fn remove(&self, handle: LobbyHandle){
+        let Some(x) = self.sync.write().await.members.remove(&handle.sessionid) else {
+            warn!("Attempt to remove non-existent session {} from the lobby", handle.sessionid);
+            return;
+        };
+
+        let announcement = format!(">>> {} has left.", "<TODO: Usename>");
+        self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
+
+        info!("Removed session {}", handle.sessionid);
+        self.update_lobby_participants().await;
+    }
+    // Broadcasts a list of lobby participants to all clients
+    async fn update_lobby_participants(&self){
+        // TODO: Rewire data such that I get usernames and not just session ids.
+        // The lobby should be able to read the session info but never prevent a session being destroyed (weak ptr).
+        // This means sessions need to be reference-counted, I think.
+        // Network programming is so different to your run-of-the-mill sequence of operations.
+        let list = self.sync.read().await.members.iter().map(|x| format!("TODO{}", x.0.0 % 100)).collect::<Vec<_>>();
+        let packet = packets::PktS2C_LobbyInfo::new(list).encode();
+        self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
     }
 }
+// impl std::ops::Drop for LobbyHandle{
+//     // Leaves the lobby
+//     fn drop(&mut self) {
+//         let this = ManuallyDrop::new(std::mem::take(self));
+//         let x = *self;
+//         tokio::spawn(async move{
+//             LOBBY.remove(x).await;
+//             std::mem::forget(x);
+//         });
+//         std::mem::forget(this);
+//     }
+// }

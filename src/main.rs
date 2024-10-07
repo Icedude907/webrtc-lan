@@ -6,6 +6,7 @@ mod packets;
 mod usersession;
 mod util;
 
+use chatroom::{Lobby, LOBBY};
 use log::{info, LevelFilter};
 use tokio::join;
 use webrtcpeer::ClientConnection;
@@ -26,10 +27,10 @@ async fn main(){
     info!("Initialising");
     let _ = join!(
         webserver_run(WEBSERVER_PORT),
-        manage_remotes(),
+        cli(),
     );
 }
 
-pub async fn manage_remotes(){
+pub async fn cli(){
 
 }

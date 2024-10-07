@@ -165,7 +165,7 @@ class PktDecoder{
     }
     public get_str_len(len: number): string{
         const stringBytes = new Uint8Array(this.view.buffer, this.ofs, len);
-        this.ofs += length;
+        this.ofs += len;
         return new TextDecoder('utf-8').decode(stringBytes);
     }
     public get_str(){
@@ -176,7 +176,8 @@ class PktDecoder{
         let length = this.view.byteLength - this.offset;
         return this.get_str_len(length);
     }
-    public get_arr<T>(reader: (decoder: PktDecoder)=>T): T[]{
+    // Calls the provided function N times as determined by the next uvarint length
+    public get_arr<T>(reader: (d: PktDecoder)=>T): T[]{
         let length = this.get_uvarint();
         return Array.from({length: length}, ()=>reader(this));
     }
@@ -230,14 +231,17 @@ let decode_S2C_SetNameReply: DecoderFunction<PktS2C_SetNameReply> = (d)=>{
 }
 let decode_S2C_LobbyInfo: DecoderFunction<PktS2C_LobbyInfo> = (d)=>{
     return {
-        users: d.get_arr((d)=>d.get_str()),
+        users: d.get_arr((d)=>{
+            // console.log(`${JSON.stringify(d)}`);
+            return d.get_str();
+        }),
     }
 }
 
 // "Lookup table" that decodes incoming packets into legible types.
 const PktDecodeLookup: { [id in PktS2Cid]: DecoderFunction<any>} = {
     [PktS2Cid.HelloReply]: decode_S2C_HelloReply,
-    [PktS2Cid.LobbyInfo]: decode_S2C_LobbyInfo,
     [PktS2Cid.ReceiveMsg]: decode_S2C_ReceiveMsg,
     [PktS2Cid.SetNameReply]: decode_S2C_SetNameReply,
+    [PktS2Cid.LobbyInfo]: decode_S2C_LobbyInfo,
 };

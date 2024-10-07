@@ -65,11 +65,11 @@ class Session{
         }else if(pkt.id === packet.PktS2Cid.SetNameReply){
             this.set_username(pkt.username);
         }else if(pkt.id === packet.PktS2Cid.LobbyInfo){
-            console.log(`Lobby info: ${pkt}`);
+            setLobbyText(pkt.users);
         }
     }
 
-    private on_connection_state_change(state: webrtc.ConnectionState){
+    private on_connection_state_change = (state: webrtc.ConnectionState)=>{
         setConnectionStatusText(webrtc.ConnectionState[state])
     }
     private set_username(username: string){
@@ -86,6 +86,23 @@ function setUsernameText(username: string){
     let box = document.getElementById("usernameBox");
     if(box == null) return;
     (box as HTMLInputElement).value = username;
+}
+function setLobbyText(users: string[]){
+    const table = document.getElementById("lobby");
+    if(table == null) return;
+    const tablebody = table.querySelector("tbody");
+    tablebody?.remove();
+    let rows: Node[] = [];
+    users.forEach(s=>{
+        const row = document.createElement('tr')
+        const cell = document.createElement('td');
+        cell.textContent = s;
+        row.appendChild(cell);
+        rows.push(row);
+    });
+    const body = document.createElement("tbody");
+    body.append(...rows);
+    table.append(body);
 }
 
 function addToLog(msg: string){

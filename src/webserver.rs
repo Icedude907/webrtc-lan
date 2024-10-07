@@ -39,9 +39,10 @@ async fn serve_static(uri: Uri, headers: HeaderMap) -> impl IntoResponse {
     StaticFile(path, headers)
 }
 
+// TODO: Embed compressed and extract for transmission?
 #[derive(rust_embed_for_web::RustEmbed)]
 #[folder = "webclient/dist/"]
-#[gzip = false] // Not targeting these plebs
+#[gzip = false] // gzip plebs use raw instead
 struct StaticFiles;
 
 pub struct StaticFile<T>(pub T, HeaderMap);
