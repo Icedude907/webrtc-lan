@@ -6,10 +6,7 @@ use just_webrtc::types::PeerConnectionState;
 use lazy_static::lazy_static;
 use log::{info, warn};
 
-use crate::{chatroom::{LobbyHandle, ParticipantMsg, LOBBY}, packets::{self, Encode}, util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}};
-
-// struct SessionTable{
-// }
+use crate::{chatroom::{ChatMsg, LobbyHandle, ParticipantMsg, LOBBY}, packets::{self, Encode, PktS2C_ReceiveMsg, PktS2C_SetNameReply}, util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}};
 
 #[derive(Deref)]
 pub struct ActiveSession{
@@ -25,18 +22,19 @@ impl ActiveSession{
         let mut handle = LOBBY.join(&self).await;
 
         loop{tokio::select! {
+            // Receive data. If error, drop the session.
             c2s = self.conn.recv() => match c2s{
-                // Receive data
                 Ok(msg)=>{
                     match self.handle_incoming(msg, &handle).await{
+                        Ok(_) => {},
                         Err(_) => break,
-                        _ => {},
                     };
                 },
                 // Connection shutdown
                 Err(RecvError::Abort)=>{ break; }
-                Err(_)=>{ warn!("Unexpected error. Closing connection."); break; }
+                Err(_)=>{ warn!("Unexpected error. Closing the connection."); break; }
             },
+            // Send data. If error, drop the session.
             s2c = handle.broadcast_rx.recv() => match s2c{
                 Ok(msg)=>{
                     match self.handle_outgoing(msg).await {
@@ -44,11 +42,12 @@ impl ActiveSession{
                         Err(x) => { warn!("Error: Could not send to client {}", x); break; }
                     }
                 },
-                Err(_)=>{ info!("Internal server error?"); break; }
+                Err(_)=>{ info!("Internal server error."); break; }
             },
+            // If WebRTC is failed, close the session.
             state = self.conn.state_change() => match self.handle_connection_state_change(state){
                 Ok(_) => {},
-                Err(_) => { info!("Connection finished"); break; }
+                Err(_) => { break; }
             },
         }}
         info!("Connection with {} has finished.", self.user.username);
@@ -56,8 +55,7 @@ impl ActiveSession{
     fn handle_connection_state_change(&self, state: PeerConnectionState) -> Result<(),()>{
         use PeerConnectionState::*;
         match state{
-            Failed => return Err(()),
-            Closed => return Err(()),
+            Failed | Closed => return Err(()),
             Connecting => info!("{} connecting...", self.user.id),
             Disconnected => info!("Connection interrupted with {}", self.user.id),
             _ => {}
@@ -66,22 +64,25 @@ impl ActiveSession{
     }
 
     // Handles incoming raw client messages and dispatches them to the appropriate location.
+    // If Err(), the caller should drop the connection.
     async fn handle_incoming(&mut self, msg: Bytes, handle: &LobbyHandle)->Result<(),()>{
         use packets::PktC2S::*;
         use crate::chatroom::ChatMsg::*;
-        info!("{} >> {:?}", self.user.username, msg);
+
         let Ok(pkt) = packets::decode(msg.to_vec()) else {
-            warn!("{} connection error", self.user.username);
-            return Err(())
+            warn!("(DROPPING) {} >> {:?}", self.user.username, msg);
+            return Err(());
         };
-        info!("\t{:?}", pkt);
+
+        info!("{} >> {:?}", self.user.username, pkt);
         match pkt{
             SendMsg(p)=>{
-                let _ = LOBBY.broadcast_tx.send(ParticipantMsg::Message(User(p.msg)));
+                let msg = format!("{}) {}", self.user.username, p.msg);
+                LOBBY.send_message(ChatMsg::User(msg));
             }
             SetName(p)=>{
                 // Send approval
-                self.send(packets::PktS2C_SetNameReply::new(p.name.clone()).encode().into()).await;
+                let _ = self.send(PktS2C_SetNameReply::new(p.name.clone()).encode()).await;
                 // Propagate server message
                 let announcement = format!(">>> {} is now {}", self.user.username, p.name);
                 if self.user.username != p.name {
@@ -92,9 +93,12 @@ impl ActiveSession{
             Goodbye(_)=>{
                 return Err(());
             }
-            _ => {},
+            _ => {
+                warn!("(UNEXPECTED. DROPPING) {}", self.user.username);
+                return Err(());
+            },
         }
-        return Ok(())
+        return Ok(());
     }
 
     // Propagates outgoing messages onto the wire.
@@ -102,8 +106,8 @@ impl ActiveSession{
     async fn handle_outgoing(&self, msg: ParticipantMsg)->Result<usize, just_webrtc::platform::Error>{
         use crate::chatroom::ChatMsg::*;
         let msg = match msg{
-            ParticipantMsg::Message(msg) => packets::PktS2C_ReceiveMsg::new(match msg{User(x)=>x, Server(x)=>x}).encode().into(),
-            ParticipantMsg::RawPacket(x) => x.into(),
+            ParticipantMsg::Message(msg) => PktS2C_ReceiveMsg::new(match msg{User(x)=>x, Server(x)=>x}).encode(),
+            ParticipantMsg::RawPacket(x) => x,
         };
         // info!("{} << {:?}", self.user.username, bytes);
         self.send(msg).await

@@ -13,9 +13,8 @@ use crate::{packets::{self, Encode}, usersession::ActiveSession};
 /// The unreliable stream is for rapidly changing info e.g.: keypresses, rng seeds
 #[derive(new)]
 pub struct ClientConnection{
-    _peer: PeerConnection,
-    _chan: Channel,
-    // connection_id: u64,
+    peer: PeerConnection,
+    chan: Channel,
 }
 
 pub enum RecvError{
@@ -27,20 +26,19 @@ impl ClientConnection{
     pub async fn recv(&self)->Result<Bytes, RecvError>{
         use RecvError::*;
         tokio::select!{
-            x = self._chan.receive() => { return x.map_err(|e|WebRTCError(e)); },
+            x = self.chan.receive() => { return x.map_err(|e|WebRTCError(e)); },
             _ = ctrl_c() => { return Err(Abort); }
         }
     }
     // usize = bytes sent
-    pub async fn send(&self, data: Bytes)->Result<usize, WebRTCError>{
+    pub async fn send(&self, data: impl Into<Bytes>)->Result<usize, WebRTCError>{
+        let data = data.into();
         info!("{} >> {:?}", "Out", data);
-        self._chan.send(&data).await
+        self.chan.send(&data).await
     }
     pub async fn state_change(&self)->PeerConnectionState{
-        self._peer.state_change().await
+        self.peer.state_change().await
     }
-    // pub fn get_id(&self)->u64{ self.connection_id }
-    // pub fn get_connection_name(&self)->String{ format!("{:016X}", self.connection_id) }
 }
 
 /// Awaiting this function will block until the connection is closed.
@@ -59,7 +57,7 @@ pub async fn manage_connection(conn: ClientConnection){
 
     // Step 3: We send HelloReply
     let reply = PktS2C_HelloReply::new(session.user.id, session.user.username.clone());
-    let Ok(_) = session.send(reply.encode().into()).await else { info!("Drop"); return; };
+    let Ok(_) = session.send(reply.encode()).await else { info!("Drop"); return; };
 
     // Step 4: We defer to the session handler
     session.handle_active_session().await;

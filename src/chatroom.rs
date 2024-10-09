@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use log::{info, warn};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
-use crate::{packets::{self, Encode}, usersession::{ActiveSession, SessionId}};
+use crate::{packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId}};
 
 #[derive(Clone)]
 pub enum ChatMsg{
@@ -49,13 +49,13 @@ pub struct LobbyHandle{
 //
 impl Lobby{
     pub fn new()->Self{
-        let (tx, _ ) = broadcast::channel(64);
+        let (broadcast_tx, _) = broadcast::channel(64);
         Self {
             sync: RwLock::new(LobbySync {
                 log: vec![],
                 members: HashMap::new()
             }),
-            broadcast_tx: tx
+            broadcast_tx
         }
     }
     // Joins the lobby.
@@ -64,14 +64,14 @@ impl Lobby{
     pub async fn join(&self, session: &ActiveSession)->LobbyHandle{
         // Send a join message to all other participants
         let announcement = format!(">>> {} has joined", session.user.username);
-        self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
+        let _ = self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
         // Create the lobby handle
         let broadcast_rx = self.broadcast_tx.subscribe();
         let (individual_tx, individual_rx) = mpsc::channel(64);
                 // Send welcome
                 let welcome = format!(">>> Welcome, {}.", session.user.username);
-                individual_tx.send(ParticipantMsg::Message(ChatMsg::Server(welcome))).await;
+                let _ = individual_tx.send(ParticipantMsg::Message(ChatMsg::Server(welcome))).await;
         self.sync.write().await.members.insert(session.user.id, individual_tx);
         let handle = LobbyHandle{ broadcast_rx, individual_rx, sessionid: session.user.id };
 
@@ -87,7 +87,7 @@ impl Lobby{
         };
 
         let announcement = format!(">>> {} has left.", "<TODO: Usename>");
-        self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
+        let _ = self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
         info!("Removed session {}", sessionid);
         self.update_lobby_participants().await;
@@ -99,8 +99,12 @@ impl Lobby{
         // This means sessions need to be reference-counted, I think.
         // Network programming is so different to your run-of-the-mill sequence of operations.
         let list = self.sync.read().await.members.iter().map(|x| format!("TODO{}", x.0.0 % 100)).collect::<Vec<_>>();
-        let packet = packets::PktS2C_LobbyInfo::new(list).encode();
-        self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
+        let packet = PktS2C_LobbyInfo::new(list).encode();
+        let _ = self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
+    }
+
+    pub fn send_message(&self, msg: ChatMsg){
+        let _ = self.broadcast_tx.send(ParticipantMsg::Message(msg));
     }
 }
 impl std::ops::Drop for LobbyHandle{
