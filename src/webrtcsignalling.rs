@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use just_webrtc::{platform::PeerConnection, types::{ICECandidate, PeerConfiguration, PeerConnectionState, SessionDescription}, DataChannelExt, PeerConnectionBuilder, PeerConnectionExt};
-use log::info;
+use log::{info, warn};
 use serde::Serialize;
 
 use crate::{webrtcpeer, ClientConnection};
@@ -14,11 +14,12 @@ pub struct SessionTuple{
 
 const REMOTE_CONNECTION_TIMEOUT: Duration = Duration::from_secs(10);
 
-pub async fn create_offer(offer: SessionDescription, connectionsource: String) -> Result<SessionTuple, ()>{
+// Attempts to create a WebRTC offer for the given inputs. If the inputs are malformed, you'll get an error back.
+pub async fn create_answer(offer: SessionDescription, connectionsource: String) -> Result<SessionTuple, ()>{
     let Ok(remote_peer_connection) = PeerConnectionBuilder::new()
         .set_config(PeerConfiguration{..Default::default()})
         .with_remote_offer(Some(offer)).map_err(|_|())?
-        .build().await else{ return Err(()) };
+        .build().await else { return Err(()) };
     // remote_peer_connection.add_ice_candidates(offer.sdp_type).await?;
     let Some(answer) = remote_peer_connection.get_local_description().await else{ return Err(()) };
     let candidates = remote_peer_connection.collect_ice_candidates().await.unwrap_or_default();
@@ -50,7 +51,9 @@ pub async fn await_connection(peer: PeerConnection, connectionsource: &str)->Res
         return Err(());
     };
 
-    let remote_channel = peer.receive_channel().await.unwrap();
+    let Ok(remote_channel) = peer.receive_channel().await else {
+        return Err(());
+    };
     remote_channel.wait_ready().await;
 
     let conn = ClientConnection::new(peer, remote_channel);

@@ -5,6 +5,7 @@ use just_webrtc::types::SessionDescription;
 use log::info;
 use rust_embed_for_web::EmbedableFile;
 use serde_json::{json, Value};
+use tokio::net::TcpListener;
 
 use crate::webrtcsignalling;
 
@@ -19,15 +20,15 @@ pub async fn webserver_run(port: u16) {
         .into_make_service_with_connect_info::<SocketAddr>();
 
     let socket = SocketAddr::from((WEBSERVER_HOST, port));
-    let listener = tokio::net::TcpListener::bind(socket).await.unwrap();
+    let listener = TcpListener::bind(socket).await.unwrap(); // Failed to bind is a fatal error
     let server = axum::serve(listener, app);
     let localip = local_ip_address::local_ip().map(|x| x.to_string()).unwrap_or("?".into());
     info!("Webserver listening at {} (localhost: http://127.0.0.1:{port}/, LAN: http://{}:{port}/)", socket, localip);
 
-    async fn shutdown_detector(){ tokio::signal::ctrl_c().await.unwrap() }
+    async fn shutdown_detector(){ tokio::signal::ctrl_c().await.unwrap() } // Infallible
     server
         .with_graceful_shutdown(shutdown_detector())
-        .await.unwrap(); // Run it
+        .await.unwrap(); // Run it. Unexpected failure is fatal
 }
 
 async fn serve_index(headers: HeaderMap) -> impl IntoResponse{
@@ -62,9 +63,11 @@ impl<T> IntoResponse for StaticFile<T> where T: Into<String>{
         } else { content.data() };
 
         let mut headers = HeaderMap::new();
-        headers.insert(header::CONTENT_TYPE, mime.to_string().parse().unwrap());
+        if let Ok(x) = mime.to_string().parse() {
+          headers.insert(header::CONTENT_TYPE, x);
+        }
         if using_br {
-            headers.insert(header::CONTENT_ENCODING, "br".parse().unwrap());
+          headers.insert(header::CONTENT_ENCODING, "br".parse().unwrap());
         }
 
         (headers, data).into_response()
@@ -80,8 +83,11 @@ impl<T> IntoResponse for StaticFile<T> where T: Into<String>{
 async fn respond_to_webrtc_offer(ConnectInfo(addr): ConnectInfo<SocketAddr>, payload: Option<Json<SessionDescription>>)->Json<Value>{
     if let Some(params) = payload {
         let id = format!("{}", addr);
-        let x = webrtcsignalling::create_offer(params.0, id).await.unwrap();
-        return Json(json!(x));
+        let x = webrtcsignalling::create_answer(params.0, id).await;
+        return match x{
+          Ok(x) => Json(json!(x)),
+          Err(_) => Json(json!({"Malformed":"The provided WebRTC offer is unusable."})),
+        };
     }else{
         return Json(json!({"Malformed":"LOL"}));
     }
