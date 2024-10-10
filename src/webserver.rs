@@ -74,7 +74,7 @@ impl<T> IntoResponse for StaticFile<T> where T: Into<String>{
       }
       None => {
         // Not found -> redirect
-        Redirect::to("/").into_response()
+        StaticFile("404.html", self.1).into_response()
       }
     }
   }
