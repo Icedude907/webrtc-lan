@@ -56,7 +56,10 @@ pub async fn manage_connection(conn: ClientConnection){
     let session = ActiveSession::new(conn);
 
     // Step 3: We send HelloReply
-    let reply = PktS2C_HelloReply::new(session.user.id, session.user.username.clone());
+    let reply = {
+        let lock = session.user.read().await;
+        PktS2C_HelloReply::new(lock.id, lock.username.clone())
+    };
     let Ok(_) = session.send(reply.encode()).await else { info!("Drop"); return; };
 
     // Step 4: We defer to the session handler

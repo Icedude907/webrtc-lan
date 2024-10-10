@@ -1,9 +1,9 @@
-use std::{collections::HashMap, future::Future};
+use std::{collections::HashMap, future::Future, sync::Arc};
 use lazy_static::lazy_static;
 use log::{info, warn};
 use tokio::sync::{broadcast, mpsc, RwLock, RwLockWriteGuard};
 
-use crate::{packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId}};
+use crate::{packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId, UserSession}};
 
 #[derive(Clone)]
 pub enum ChatMsg{
@@ -14,10 +14,6 @@ pub enum ChatMsg{
 pub enum ParticipantMsg{
     Message(ChatMsg),
     RawPacket(Vec<u8>)
-}
-#[derive(Clone)]
-pub struct LobbyInfo{
-    members: Vec<String>
 }
 
 // Global lobby
@@ -35,10 +31,16 @@ unsafe impl Sync for Lobby{}
 pub struct LobbySync{
     log: Vec<ChatMsg>,
     // Maps client session ids with their individual send channel - used so the lobby can send directly to a single person (e.g.: Name changes)
-    members: HashMap<SessionId, mpsc::Sender<ParticipantMsg>>,
+    members: HashMap<SessionId, LobbyMember>,
 }
+
+pub struct LobbyMember{
+    send: mpsc::Sender<ParticipantMsg>,
+    view: Arc<RwLock<UserSession>>, // NOTE: We never have dead members because LobbyHandle removes from the view
+}
+
 /// A client's handle to the lobby.
-/// Destroying this is equivalent to exiting the lobby.
+/// Destroying this object exits the session from the lobby.
 pub struct LobbyHandle{
     pub broadcast_rx: broadcast::Receiver<ParticipantMsg>,
     pub individual_rx: mpsc::Receiver<ParticipantMsg>,
@@ -63,17 +65,21 @@ impl Lobby{
     // For a lobby participant to send to the lobby, access through the global LOBBY
     pub async fn join(&self, session: &ActiveSession)->LobbyHandle{
         // Send a join message to all other participants
-        let announcement = format!(">>> {} has joined", session.user.username);
+        let announcement = format!(">>> {} has joined", session.user().await.username);
         let _ = self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
         // Create the lobby handle
         let broadcast_rx = self.broadcast_tx.subscribe();
         let (individual_tx, individual_rx) = mpsc::channel(64);
                 // Send welcome
-                let welcome = format!(">>> Welcome, {}.", session.user.username);
+                let welcome = format!(">>> Welcome, {}.", session.user().await.username);
                 let _ = individual_tx.send(ParticipantMsg::Message(ChatMsg::Server(welcome))).await;
-        self.sync.write().await.members.insert(session.user.id, individual_tx);
-        let handle = LobbyHandle{ broadcast_rx, individual_rx, sessionid: session.user.id };
+        let member = LobbyMember{
+            send: individual_tx,
+            view: session.user.clone(),
+        };
+        self.write_sync().await.members.insert(session.user().await.id, member);
+        let handle = LobbyHandle{ broadcast_rx, individual_rx, sessionid: session.user().await.id };
 
         // update_participants
         self.update_lobby_participants().await;
@@ -81,12 +87,13 @@ impl Lobby{
     }
     // Removes a member & broadcasts the new lobby participant table
     pub async fn remove(&self, sessionid: SessionId){
-        let Some(x) = self.sync.write().await.members.remove(&sessionid) else {
+        let Some(session) = self.write_sync().await.members.remove(&sessionid) else {
             warn!("Attempt to remove non-existent session {} from the lobby", sessionid);
             return;
         };
 
-        let announcement = format!(">>> {} has left.", "<TODO: Usename>");
+        let username = session.view.read().await.username.clone();
+        let announcement = format!(">>> {} has left.", username);
         let _ = self.broadcast_tx.send(ParticipantMsg::Message(ChatMsg::Server(announcement)));
 
         info!("Removed session {}", sessionid);
@@ -94,11 +101,15 @@ impl Lobby{
     }
     // Broadcasts a list of lobby participants to all clients
     async fn update_lobby_participants(&self){
-        // TODO: Rewire data such that I get usernames and not just session ids.
-        // The lobby should be able to read the session info but never prevent a session being destroyed (weak ptr).
-        // This means sessions need to be reference-counted, I think.
         // Network programming is so different to your run-of-the-mill sequence of operations.
-        let list = self.sync.read().await.members.iter().map(|x| format!("TODO{}", x.0.0 % 100)).collect::<Vec<_>>();
+        // This is not technically optimal because I should run futures for each of these reads.
+        // ARRGH.
+        let mut list = vec![];
+        for x in self.sync.read().await.members.iter() {
+            // Soundness: always sound since destruction of LobbyHandle removes Weak in map.
+            let name = x.1.view.read().await.username.clone();
+            list.push(name);
+        }
         let packet = PktS2C_LobbyInfo::new(list).encode();
         let _ = self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
     }

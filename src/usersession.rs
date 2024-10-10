@@ -1,29 +1,41 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use bytes::Bytes;
-use derive_more::derive::{Deref, Display};
+use derive_more::derive::Display;
 use just_webrtc::types::PeerConnectionState;
 use lazy_static::lazy_static;
 use log::{info, warn};
+use tokio::sync::{RwLock, RwLockReadGuard};
+use just_webrtc::platform::Error as WebRTCError;
 
 use crate::{chatroom::{ChatMsg, LobbyHandle, ParticipantMsg, LOBBY}, packets::{self, Encode, PktS2C_ReceiveMsg, PktS2C_SetNameReply}, util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}};
 
-#[derive(Deref)]
+// #[derive(Deref)]
 pub struct ActiveSession{
-    #[deref]
     conn: ClientConnection,
-    pub user: UserSession
+    pub user: Arc<RwLock<UserSession>>
 }
 impl ActiveSession{
     pub fn new(conn: ClientConnection)->Self{
-        Self{conn, user: UserSession::new()}
+        Self{conn, user: Arc::new(RwLock::new(UserSession::new()))}
     }
+    pub async fn recv(&self)->Result<Bytes, RecvError>{
+        self.conn.recv().await
+    }
+    // usize = bytes sent
+    pub async fn send(&self, data: impl Into<Bytes>)->Result<usize, WebRTCError>{
+        self.conn.send(data).await
+    }
+    pub async fn user(&self)->RwLockReadGuard<'_, UserSession>{
+        self.user.read().await
+    }
+
     pub async fn handle_active_session(mut self){
         let mut handle = LOBBY.join(&self).await;
 
         loop{tokio::select! {
             // Receive data. If error, drop the session.
-            c2s = self.conn.recv() => match c2s{
+            c2s = self.recv() => match c2s{
                 Ok(msg)=>{
                     match self.handle_incoming(msg, &handle).await{
                         Ok(_) => {},
@@ -45,19 +57,19 @@ impl ActiveSession{
                 Err(_)=>{ info!("Internal server error."); break; }
             },
             // If the WebRTC state is failed, close the session.
-            state = self.conn.state_change() => match self.handle_connection_state_change(state){
+            state = self.conn.state_change() => match self.handle_connection_state_change(state).await{
                 Ok(_) => {},
                 Err(_) => { break; }
             },
         }}
-        info!("Connection with {} has finished.", self.user.username);
+        info!("Connection with {} has finished.", self.user().await.username);
     }
-    fn handle_connection_state_change(&self, state: PeerConnectionState) -> Result<(),()>{
+    async fn handle_connection_state_change(&self, state: PeerConnectionState) -> Result<(),()>{
         use PeerConnectionState::*;
         match state{
             Failed | Closed => return Err(()),
-            Connecting => info!("{} connecting...", self.user.id),
-            Disconnected => info!("Connection interrupted with {}", self.user.id),
+            Connecting => info!("{} connecting...", self.user().await.id),
+            Disconnected => info!("Connection interrupted with {}", self.user().await.id),
             _ => {}
         }
         return Ok(())
@@ -70,31 +82,31 @@ impl ActiveSession{
         use crate::chatroom::ChatMsg::*;
 
         let Ok(pkt) = packets::decode(msg.to_vec()) else {
-            warn!("(DROPPING) {} >> {:?}", self.user.username, msg);
+            warn!("(DROPPING) {} >> {:?}", self.user().await.username, msg);
             return Err(());
         };
 
-        info!("{} >> {:?}", self.user.username, pkt);
+        info!("{} >> {:?}", self.user().await.username, pkt);
         match pkt{
             SendMsg(p)=>{
-                let msg = format!("{}) {}", self.user.username, p.msg);
+                let msg = format!("{}) {}", self.user().await.username, p.msg);
                 LOBBY.send_message(ChatMsg::User(msg)).await;
             }
             SetName(p)=>{
                 // Send approval
                 let _ = self.send(PktS2C_SetNameReply::new(p.name.clone()).encode()).await;
                 // Propagate server message
-                let announcement = format!(">>> {} is now {}", self.user.username, p.name);
-                if self.user.username != p.name {
+                let announcement = format!(">>> {} is now {}", self.user().await.username, p.name);
+                if self.user().await.username != p.name {
                     let _ = LOBBY.broadcast_tx.send(ParticipantMsg::Message(Server(announcement)));
-                    self.user.username = p.name;
+                    self.user.write().await.username = p.name;
                 }
             }
             Goodbye(_)=>{
                 return Err(());
             }
             _ => {
-                warn!("(UNEXPECTED. DROPPING) {}", self.user.username);
+                warn!("(UNEXPECTED. DROPPING) {}", self.user().await.username);
                 return Err(());
             },
         }
