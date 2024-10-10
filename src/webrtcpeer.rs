@@ -33,7 +33,7 @@ impl ClientConnection{
     // usize = bytes sent
     pub async fn send(&self, data: impl Into<Bytes>)->Result<usize, WebRTCError>{
         let data = data.into();
-        info!("{} >> {:?}", "Out", data);
+        info!("{} << {:?}", "Out", data);
         self.chan.send(&data).await
     }
     pub async fn state_change(&self)->PeerConnectionState{

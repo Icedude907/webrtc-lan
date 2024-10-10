@@ -44,7 +44,7 @@ impl ActiveSession{
                 },
                 Err(_)=>{ info!("Internal server error."); break; }
             },
-            // If WebRTC is failed, close the session.
+            // If the WebRTC state is failed, close the session.
             state = self.conn.state_change() => match self.handle_connection_state_change(state){
                 Ok(_) => {},
                 Err(_) => { break; }
@@ -78,7 +78,7 @@ impl ActiveSession{
         match pkt{
             SendMsg(p)=>{
                 let msg = format!("{}) {}", self.user.username, p.msg);
-                LOBBY.send_message(ChatMsg::User(msg));
+                LOBBY.send_message(ChatMsg::User(msg)).await;
             }
             SetName(p)=>{
                 // Send approval

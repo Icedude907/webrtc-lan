@@ -1,7 +1,7 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 use lazy_static::lazy_static;
 use log::{info, warn};
-use tokio::sync::{broadcast, mpsc, RwLock};
+use tokio::sync::{broadcast, mpsc, RwLock, RwLockWriteGuard};
 
 use crate::{packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId}};
 
@@ -103,8 +103,13 @@ impl Lobby{
         let _ = self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));
     }
 
-    pub fn send_message(&self, msg: ChatMsg){
-        let _ = self.broadcast_tx.send(ParticipantMsg::Message(msg));
+    pub async fn send_message(&self, msg: ChatMsg){
+        let _ = self.broadcast_tx.send(ParticipantMsg::Message(msg.clone()));
+        self.write_sync().await.log.push(msg);
+    }
+
+    fn write_sync(&self)->impl Future<Output = RwLockWriteGuard<'_, LobbySync>>{
+        self.sync.write()
     }
 }
 impl std::ops::Drop for LobbyHandle{
