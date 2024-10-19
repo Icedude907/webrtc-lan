@@ -3,7 +3,7 @@ use lazy_static::lazy_static;
 use log::{info, warn};
 use tokio::sync::{broadcast, mpsc, RwLock, RwLockWriteGuard};
 
-use crate::{packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId, UserSession}};
+use crate::{fi, packets::{Encode, PktS2C_LobbyInfo}, usersession::{ActiveSession, SessionId, UserSession}};
 
 #[derive(Clone)]
 pub enum ChatMsg{
@@ -100,15 +100,17 @@ impl Lobby{
         self.update_lobby_participants().await;
     }
     // Broadcasts a list of lobby participants to all clients
-    async fn update_lobby_participants(&self){
+    pub async fn update_lobby_participants(&self){
         // Network programming is so different to your run-of-the-mill sequence of operations.
         // This is not technically optimal because I should run futures for each of these reads.
         // ARRGH.
         let mut list = vec![];
         for x in self.sync.read().await.members.iter() {
-            // Soundness: always sound since destruction of LobbyHandle removes Weak in map.
-            let name = x.1.view.read().await.username.clone();
-            list.push(name);
+            let (name, hand) = {
+                let x = x.1.view.read().await;
+                (x.username.clone(), x.raised_hand)
+            };
+            list.push(format!("{}{}", fi!(hand, "👋", ""), name));
         }
         let packet = PktS2C_LobbyInfo::new(list).encode();
         let _ = self.broadcast_tx.send(ParticipantMsg::RawPacket(packet));

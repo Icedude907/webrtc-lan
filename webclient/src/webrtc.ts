@@ -1,3 +1,4 @@
+import { TypedArray } from "three";
 
 export enum ConnectionState{
     Connecting, // When initalising or in the event of a connection hiccup.
@@ -10,22 +11,18 @@ export enum ConnectionState{
 // Creating this class causes a connection attempt that will resolve in the future.
 export class WebRTCConnection{
     private peer: RTCPeerConnection;
-    private data: RTCDataChannel;
+    private chanr: RTCDataChannel;
+    private chanu: RTCDataChannel;
 
     constructor(
         cb_connection_state: (state: ConnectionState)=>void,
         cb_recv: (data: ArrayBuffer)=>void,
     ){
         this.peer = new RTCPeerConnection();
-        this.data = this.peer.createDataChannel("c2s", {
-            // WebRTC is packet based but normally reliable+ordered in transmission
-            // You can disable these by flipping these switches, making the connection UDP-like
-            // maxRetransmits: 0, ordered: false,
-        })
-        this.data.binaryType = "arraybuffer";
-
-        this.data.onclose = ()=>this.peer.close()
-        this.data.onmessage = ({data/*ArrayBuffer*/})=>cb_recv(data as ArrayBuffer);
+        this.chanr = this.create_channel(cb_recv, "ro");
+        this.chanu = this.create_channel(cb_recv, "uu", { // unreliable, unordered
+            maxRetransmits: 0, ordered: false
+        });
         this.peer.onconnectionstatechange = ()=>{
             const state = this.peer.connectionState;
             switch (state) {
@@ -45,8 +42,15 @@ export class WebRTCConnection{
         };
     }
 
+    private create_channel(cb_recv: (data: ArrayBuffer)=>void, label: string, dataChannelDict?: RTCDataChannelInit){
+        let channel = this.peer.createDataChannel(label, dataChannelDict);
+        channel.binaryType = "arraybuffer";
+        channel.onclose = ()=>this.peer.close()
+        channel.onmessage = ({data/*ArrayBuffer*/})=>cb_recv(data as ArrayBuffer);
+        return channel;
+    }
+
     // Attempts to connect to the remote. Returns when connected or failed.
-    // cb_connection_state() will run as the connection state changes. (TODO: Precice behaviours?)
     public async connect(){
         // Do the connection
         let offer = await this.peer.createOffer();
@@ -54,18 +58,22 @@ export class WebRTCConnection{
         let response = await this.exchange_connection_details(offer);
         this.peer.setRemoteDescription(response.description);
         response.candidates.forEach(e => { this.peer.addIceCandidate(e) });
-        // Wait for it to be established
-        await new Promise<void>((resolve, reject)=>this.data.onopen = ()=>resolve())
+        // Wait for it to be established (TODO: chanu?)
+        await new Promise<void>((resolve, reject)=>this.chanr.onopen = ()=>resolve())
     }
 
     public disconnect(){
-        this.data.close();
+        this.chanr.close();
+        this.chanu.close();
         this.peer.close();
     }
 
     // Dataview is apparently safe https://developer.mozilla.org/en-US/docs/Web/API/RTCDataChannel/send
-    public send(data: Blob|ArrayBuffer|DataView){
-        this.data.send(data as any);
+    public send(data: Blob|ArrayBuffer|DataView|TypedArray){
+        this.chanr.send(data as any);
+    }
+    public send_unreliable(data: Blob|ArrayBuffer|DataView|TypedArray){
+        this.chanu.send(data as any);
     }
 
     private async exchange_connection_details(offer: RTCSessionDescriptionInit):Promise<{

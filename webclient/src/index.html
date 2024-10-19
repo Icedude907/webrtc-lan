@@ -22,6 +22,11 @@
         .submitButton {
             width: 80px;
         }
+        #roundButton {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
         .editable-input {
             border: 1px dashed #ccc;
             padding: 5px;
@@ -36,18 +41,21 @@
     </style>
 </head>
 <body>
-    <h1 id="connectionStatus">Loading…</h1>
+    <div class="flexboxleft">
+        <h1 id="connectionStatus">Loading…</h1>
+        <button id="roundButton">👋</button>
+    </div>
     <textarea id="displayBox" readonly value="" autocomplete="off"></textarea><br>
 
     <div class="flexboxleft">
         <input type="text" id="inputBox" placeholder="Write your message here">
-        <button class="submitButton" onclick="submitMessage()">Submit</button>
+        <button class="submitButton" id="inputSubmit">Submit</button>
     </div>
 
     <div class="flexboxleft">
         <h3>Chatting as</h3>
         <input type="text" class="editable-input" id="usernameBox" value="...connecting" />
-        <button class="submitButton" onclick="submitNameChange()">Change</button>
+        <button class="submitButton" id="usernameSubmit">Change</button>
     </div>
 
     <table id="lobby">

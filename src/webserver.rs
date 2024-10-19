@@ -1,6 +1,6 @@
 use std::net::{Ipv4Addr, SocketAddr};
 
-use axum::{extract::ConnectInfo, http::{header, HeaderMap, Uri}, response::{IntoResponse, Redirect, Response}, routing::{get, post}, Json, Router};
+use axum::{extract::ConnectInfo, http::{header, HeaderMap, Uri}, response::{IntoResponse, Response}, routing::{get, post}, Json, Router};
 use just_webrtc::types::SessionDescription;
 use log::info;
 use rust_embed_for_web::EmbedableFile;
@@ -10,12 +10,14 @@ use tokio::net::TcpListener;
 use crate::webrtcsignalling;
 
 const WEBSERVER_HOST: Ipv4Addr = Ipv4Addr::new(0, 0, 0, 0);
+const URL_ROOT: &str = "index.html";
+const URL_404: &str = "404.html";
 
 pub async fn webserver_run(port: u16) {
     // Serve the web folder with the client in it
     let app = Router::new()
-        .route("/", get(serve_index))
-        .route("/connect", post(respond_to_webrtc_offer)) // Also the signalling subsystem
+        .route("/", get(serve_root))
+        .route("/connect", post(respond_to_webrtc_offer)) // Defers to the signalling subsystem
         .fallback_service(get(serve_static))
         .into_make_service_with_connect_info::<SocketAddr>();
 
@@ -31,10 +33,12 @@ pub async fn webserver_run(port: u16) {
         .await.unwrap(); // Run it. Unexpected failure is fatal
 }
 
-async fn serve_index(headers: HeaderMap) -> impl IntoResponse{
-    StaticFile("index.html", headers)
+/// Serves the root page
+async fn serve_root(headers: HeaderMap) -> impl IntoResponse{
+    StaticFile(URL_ROOT, headers)
 }
 
+/// Serves a static url
 async fn serve_static(uri: Uri, headers: HeaderMap) -> impl IntoResponse {
     let path = uri.path().trim_start_matches('/').to_string();
     StaticFile(path, headers)
@@ -73,8 +77,8 @@ impl<T> IntoResponse for StaticFile<T> where T: Into<String>{
         (headers, data).into_response()
       }
       None => {
-        // Not found -> redirect
-        StaticFile("404.html", self.1).into_response()
+        // Not found
+        StaticFile(URL_404, self.1).into_response()
       }
     }
   }

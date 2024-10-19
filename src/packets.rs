@@ -22,6 +22,7 @@ enum PktC2Sid{
     SendMsg = 1,
     SetName = 2,
     Goodbye = 3,
+    Buttons = 4,
 }
 
 #[repr(u8)]
@@ -39,11 +40,13 @@ pub enum PktC2S{
     SendMsg(PktC2S_SendMsg),
     SetName(PktC2S_SetName),
     Goodbye(PktC2S_Goodbye),
+    Buttons(PktC2S_Buttons)
 }
 #[derive(Debug)] pub struct PktC2S_Hello{pub sid: Option<SessionId>}
 #[derive(Debug)] pub struct PktC2S_SendMsg{pub msg: String}
 #[derive(Debug)] pub struct PktC2S_SetName{pub name: String}
 #[derive(Debug)] pub struct PktC2S_Goodbye{}
+#[derive(Debug)] pub struct PktC2S_Buttons{pub pressed: bool}
 
 #[derive(From)]
 enum PktS2C{
@@ -205,6 +208,14 @@ impl Decode for PktC2S_Goodbye{
         Ok(Self{})
     }
 }
+impl Decode for PktC2S_Buttons{
+    fn decode(src: &mut Decoder) -> Result<Self, ()> {
+        let pressed = src.get_u8()? != 0;
+        Ok(Self { pressed })
+    }
+}
+//
+
 impl Encode for PktS2C_HelloReply{
     fn encode(self) -> Vec<u8> {
         let mut enc = Encoder::new();
@@ -253,6 +264,7 @@ pub fn decode(src: Vec<u8>) -> R<PktC2S>{
         SendMsg => PktC2S_SendMsg::decode(&mut src)?.into(),
         SetName => PktC2S_SetName::decode(&mut src)?.into(),
         Goodbye => PktC2S_Goodbye::decode(&mut src)?.into(),
+        Buttons => PktC2S_Buttons::decode(&mut src)?.into(),
     };
     return Ok(result);
 }

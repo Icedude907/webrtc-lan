@@ -8,7 +8,11 @@ use log::{info, warn};
 use tokio::sync::{RwLock, RwLockReadGuard};
 use just_webrtc::platform::Error as WebRTCError;
 
-use crate::{chatroom::{ChatMsg, LobbyHandle, ParticipantMsg, LOBBY}, packets::{self, Encode, PktS2C_ReceiveMsg, PktS2C_SetNameReply}, util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}};
+use crate::{
+    chatroom::{ChatMsg, LobbyHandle, ParticipantMsg, LOBBY},
+    packets::{self, Encode, PktS2C_ReceiveMsg, PktS2C_SetNameReply},
+    util::UUIDGen, webrtcpeer::{ClientConnection, RecvError}
+};
 
 // #[derive(Deref)]
 pub struct ActiveSession{
@@ -32,7 +36,6 @@ impl ActiveSession{
 
     pub async fn handle_active_session(mut self){
         let mut handle = LOBBY.join(&self).await;
-
         loop{tokio::select! {
             // Receive data. If error, drop the session.
             c2s = self.recv() => match c2s{
@@ -49,12 +52,22 @@ impl ActiveSession{
             // Send data. If error, drop the session.
             s2c = handle.broadcast_rx.recv() => match s2c{
                 Ok(msg)=>{
-                    match self.handle_outgoing(msg).await {
+                    match self.handle_outgoing(msg).await{
                         Ok(_) => {},
                         Err(x) => { warn!("Error: Could not send to client {}", x); break; }
                     }
                 },
                 Err(_)=>{ info!("Internal server error."); break; }
+            },
+            // FIXME: Use functions
+            s2c = handle.individual_rx.recv() => match s2c{
+                Some(msg)=>{
+                    match self.handle_outgoing(msg).await{
+                        Ok(_) => {},
+                        Err(x) => { warn!("Error: Could not send to client {}", x); break; }
+                    }
+                },
+                None=>{ info!("Internal server error."); break; }
             },
             // If the WebRTC state is failed, close the session.
             state = self.conn.state_change() => match self.handle_connection_state_change(state).await{
@@ -86,29 +99,39 @@ impl ActiveSession{
             return Err(());
         };
 
-        info!("{} >> {:?}", self.user().await.username, pkt);
-        match pkt{
-            SendMsg(p)=>{
-                let msg = format!("{}) {}", self.user().await.username, p.msg);
-                LOBBY.send_message(ChatMsg::User(msg)).await;
-            }
-            SetName(p)=>{
-                // Send approval
-                let _ = self.send(PktS2C_SetNameReply::new(p.name.clone()).encode()).await;
-                // Propagate server message
-                let announcement = format!(">>> {} is now {}", self.user().await.username, p.name);
-                if self.user().await.username != p.name {
-                    let _ = LOBBY.broadcast_tx.send(ParticipantMsg::Message(Server(announcement)));
-                    self.user.write().await.username = p.name;
+        'a:{
+            match pkt{
+                Buttons(p) => {
+                    self.user.write().await.raised_hand = p.pressed;
+                    LOBBY.update_lobby_participants().await; // NOT EFFICIENT, but present for the demo
+                    break 'a;
                 }
+                _ => {}
             }
-            Goodbye(_)=>{
-                return Err(());
+            info!("{} >> {:?}", self.user().await.username, pkt);
+            match pkt{
+                SendMsg(p)=>{
+                    let msg = format!("{}) {}", self.user().await.username, p.msg);
+                    LOBBY.send_message(ChatMsg::User(msg)).await;
+                }
+                SetName(p)=>{
+                    // Send approval
+                    let _ = self.send(PktS2C_SetNameReply::new(p.name.clone()).encode()).await;
+                    // Propagate server message
+                    let announcement = format!(">>> {} is now {}", self.user().await.username, p.name);
+                    if self.user().await.username != p.name {
+                        let _ = LOBBY.broadcast_tx.send(ParticipantMsg::Message(Server(announcement)));
+                        self.user.write().await.username = p.name;
+                    }
+                }
+                Goodbye(_)=>{
+                    return Err(());
+                }
+                _ => {
+                    warn!("(UNEXPECTED. DROPPING) {}", self.user().await.username);
+                    return Err(());
+                },
             }
-            _ => {
-                warn!("(UNEXPECTED. DROPPING) {}", self.user().await.username);
-                return Err(());
-            },
         }
         return Ok(());
     }
@@ -133,6 +156,7 @@ pub struct SessionId(pub u64);
 pub struct UserSession{
     pub id: SessionId,
     pub username: String,
+    pub raised_hand: bool,
 }
 impl UserSession{
     pub fn new()->Self{
@@ -140,7 +164,7 @@ impl UserSession{
             static ref ID_GEN: Mutex<UUIDGen> = UUIDGen::new_now().into();
         }
         let id = ID_GEN.lock().unwrap().next();
-        Self { id: SessionId(id), username: Self::get_username_for_id(id) }
+        Self { id: SessionId(id), username: Self::get_username_for_id(id), raised_hand: false }
     }
     pub fn get_username_for_id(id: u64)->String{
         let usernames = ["Abiu","Akebi","Ackee","African","American","Apple","Apricot","Aratiles","Araza","Avocado","Banana","Bilberry","Blackberry","Blackcurrant","Blueberry","Boysenberry","Breadfruit","Cactus","Canistel","Catmon","Cempedak","Cherimoya","Cherry","Chico","Citron","Cloudberry","Coco","Coconut","Crab","Cranberry","Currant","Damson","Date","Dragonfruit","Durian","Elderberry","Feijoa","Fig","Finger","Gac","Goji","Gooseberry","Grape","Raisin","Grapefruit","Grewia","Guava","Hala","Haws,","Honeyberry","Huckleberry","Jabuticaba","Jackfruit","Jambul","Japanese","Jostaberry","Jujube","Juniper","Kaffir","Kiwano","Kiwifruit","Kumquat","Lanzones","Lemon","Lime","Loganberry","Longan","Loquat","Lulo","Lychee","Magellan","Macopa","Mamey","Mamey","Mango","Mangosteen","Marionberry","Medlar","Melon","Cantaloupe","Galia","Honeydew","Mouse","Muskmelon","Watermelon","Miracle","Momordica","Monstera","Mulberry","Nance","Nectarine","Orange","Blood","Clementine","Mandarine","Tangerine","Papaya","Passionfruit","Pawpaw","Peach","Pear","Persimmon","Plantain","Plum","Prune","Pineapple","Pineberry","Plumcot","Pomegranate","Pomelo","Quince","Raspberry","Salmonberry","Rambutan","Redcurrant","Rose","Salal","Salak","Santol","Sapodilla","Sapote","Sarguelas","Satsuma","Sloe","Soursop","Star","Strawberry","Sugar","Suriname","Tamarillo","Tamarind","Tangelo","Tayberry","Thimbleberry","Ugli","White","Ximenia","Yuzu"];

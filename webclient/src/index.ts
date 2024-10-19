@@ -1,20 +1,32 @@
 import * as webrtc from "./webrtc"
 import * as packet from "./packets"
 
+let buttonpressed = false
+
 // Requires the page to be loaded.
 document.addEventListener('DOMContentLoaded', (_) => {
-    document.getElementById('inputBox')!.addEventListener('keypress', function(event) {
+    document.getElementById('inputBox')!.onkeydown = (event)=>{
         if (event.key === 'Enter') {
             event.preventDefault(); // Prevent the default action (form submission)
             submitMessage();
         }
-    });
-    document.getElementById('usernameBox')!.addEventListener('keypress', (e)=>{
+    };
+    document.getElementById('inputSubmit')!.onclick = ()=>submitMessage();
+    document.getElementById('usernameBox')!.onkeydown = (e)=>{
         if (e.key === "Enter"){
             e.preventDefault();
             submitNameChange();
         }
-    })
+    };
+    document.getElementById('usernameSubmit')!.onclick = ()=>submitNameChange();
+
+    let presser = document.getElementById('roundButton')!;
+    presser.addEventListener('mousedown'  , () => buttonpressed = true );
+    presser.addEventListener('mouseup'    , () => buttonpressed = false);
+    presser.addEventListener('mouseleave' , () => buttonpressed = false); // To handle the case where the mouse leaves the button
+    presser.addEventListener('touchstart' , () => buttonpressed = true );
+    presser.addEventListener('touchend'   , () => buttonpressed = false);
+    presser.addEventListener('touchcancel', () => buttonpressed = false); // To handle touch cancel event
 })
 // Destroys the webrtc connection, rather than having to wait for a timeout event on the server side.
 window.addEventListener('beforeunload', (_)=>{
@@ -31,12 +43,16 @@ async function main(){
 class Session{
     private conn: webrtc.WebRTCConnection;
     private username: string;
+    private users: string[];
     private sessionid: Uint8Array|null;
+    private periodic_pinger: number|undefined;
 
     constructor(){
         this.conn = new webrtc.WebRTCConnection(this.on_connection_state_change, this.recv_packet);
         this.username = "";
+        this.users = [];
         this.sessionid = null;
+        this.periodic_pinger = undefined;
     }
 
     public async connect(){
@@ -49,6 +65,7 @@ class Session{
         this.conn.send(packet.encode_C2S_Goodbye());
         this.conn.disconnect();
         sess = undefined;
+        clearInterval(this.periodic_pinger);
     }
 
     public send_message(message: string){
@@ -56,6 +73,11 @@ class Session{
     }
     public send_name_change(name: string){
         this.conn.send(packet.encode_C2S_SetName(name));
+    }
+    public on_connection_established = ()=>{
+        this.periodic_pinger = setInterval(() => {
+            this.conn.send_unreliable(packet.encode_C2S_Buttons(buttonpressed))
+        }, 100); // 100ms
     }
 
     // Arrow function inherits this, but regular function does not. WHAT
@@ -70,12 +92,17 @@ class Session{
         if(pkt.id === packet.PktS2Cid.HelloReply){
             this.sessionid = pkt.sid;
             this.set_username(pkt.username)
+            this.on_connection_established()
         }else if(pkt.id === packet.PktS2Cid.ReceiveMsg){
             addToLog(pkt.msg);
         }else if(pkt.id === packet.PktS2Cid.SetNameReply){
             this.set_username(pkt.username);
         }else if(pkt.id === packet.PktS2Cid.LobbyInfo){
-            setLobbyText(pkt.users);
+            // Just makes sure we don't update the display for no reason.
+            if( arrayEqual(pkt.users, this.users) == false ){
+                this.users = pkt.users;
+                setLobbyText(pkt.users);
+            }
         }
     }
 
@@ -113,6 +140,16 @@ function setLobbyText(users: string[]){
     const body = document.createElement("tbody");
     body.append(...rows);
     table.append(body);
+}
+
+function arrayEqual<T>(a: T[], b: T[]){
+    if (a === b) return true;
+    if (a == null || b == null) return false;
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; ++i) {
+      if (a[i] !== b[i]) return false;
+    }
+    return true;
 }
 
 function addToLog(msg: string){
