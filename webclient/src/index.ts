@@ -62,10 +62,10 @@ class Session{
     }
     // Destroy the connection and the session on page close
     public shutdown(){
+        clearInterval(this.periodic_pinger);
         this.conn.send(packet.encode_C2S_Goodbye());
         this.conn.disconnect();
         sess = undefined;
-        clearInterval(this.periodic_pinger);
     }
 
     public send_message(message: string){

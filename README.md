@@ -86,6 +86,7 @@ C2S (client to server)
 - `2`; Set name
     - `exhaustive_str` name
 - `3`; Goodbye. Ends the existing session
+- `4`; (Unreliable). Wave button. 1/true indicates waving, 0/false indicates released. Sends 10x per second.
 
 S2C (server to client)
 - `0`; HelloReply
