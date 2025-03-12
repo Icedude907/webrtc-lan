@@ -5,17 +5,21 @@ That's what this project showcases.
 ------
 
 ### The theory
-Out of the three viable methods I had to do this:
-- Http request polling
+Currently there are three viable methods to communicate with a server after page load:
+- HTTP requests
 - Websockets
 - WebRTC
 
-WebRTC is the only one that's packet based and doesn't require packet ordering (which slows down real-time communication).
+All three support reliable-and-ordered communication (i.e.: streams), but WebRTC distinguishes itself by supporting unreliable and unordered packets too.
+Removing these constraints can drastically improve latency in many cases.
+Ordering relative to other packets is generally not required, and packets relaying high-frequency information can afford to miss a couple so long as the most up-to-date one arrives.
 
-However: *This has been quite an ordeal.*
+This demo utilises both the reliable-ordered mode for sending chat messages, and an unreliable-unordered mode for sending realtime user input (a 'wave' button).
 
 #### Solution
-Roll the webserver serving the client application, a custom signalling subsystem, the application's server system, and the WebRTC peer connection code into a single application.
+It turns out getting WebRTC working is *quite an ordeal*.
+
+In this project, I've rolled a webserver (which provides the webpage), a WebRTC signalling subsystem, the WebRTC peer connection code, and the 'chat app' logic into a single program.
 
 This is how the connection is established:
 1. Provide the client with a client applet (`index.html`) via the webserver (currently [`axum`](https://github.com/tokio-rs/axum))
@@ -30,21 +34,14 @@ This is how the connection is established:
 
 ![](./docs/README/ServerOnWebRTC.png)
 
-Project uses `tokio` because it has to. Apologies if this causes incompatibilities, its out of my hands.
-
-This is all very complex in my mind (do web developers find this simple?) but apparently things could become simpler soon.
-There's been talk of a Raw UDP socket api for the web which, when abstracted over with a library providing redundant channels - could replace WebRTC for this use case. For now though, this complex system remains in use.
-
-<!-- TODO: What I wanted, what I needed, what I got -->
+##### Hope for the future?
+There's talk of a Raw UDP Socket Api which could replace WebRTC for unreliable-mode, but could be slower for reliable-mode since more processing needs to be done in JS-land instead of Browserville.
 
 #### Handling disconnects
-When a client/browser calls `WebRTCPeerConnection.close()`, they seemingly close their socket unceremoniously without telling the server.
-This is tantamount to a network-related disconnect (e.g.: due to poor wifi).
+The server will recognise network-related disconnects as end-of-session. A real application may attempt to restore the session instead.
 
-This means our protocol needs to build in a graceful exit mechanism (see below).
-
-Currently, the server will recognise network-related disconnects as end-of-session. This is subject to change.
-1. It tries to send a packet but the channel is closed
+These also constitute an end-of-session:
+1. Trying to send a packet but the channel is closed
 2. The WebRTC connection status swaps to 'failed'
 
 -----
@@ -57,7 +54,7 @@ To build this project, you will need:
 
 #### Debug
 - `cargo run` will host the web server. Static pages will be served from `./webclient/dist` relative to working directory.
-- `pnpm dev` will run the parcel server in the background, automatically rebuilding the web pages as you change the source. Changes are visible as soon as you refresh the page (take care with client-side caching behaviour).
+- `pnpm dev` will run the parcel server in the background, automatically rebuilding the web pages as you change the source. Changes are visible as soon as you refresh the page (take care with browser-side caching).
 
 #### Release building
 - `make release` or type the commands contained into your terminal
@@ -76,7 +73,7 @@ Types:
 - `exhaustive_str` a `utf8` buffer that reads to the end of the packet.
 - `uvarint`: Unsigned variable length integer. Little endian encoded, setting the top bit of the byte indicates more the next byte contains 7 more bits. Max length is 4 bytes -> 28 bits (top bit of last byte is ignored).
 - `sessionid`: 64 bits / `[8]u8`
-- `[]x`: `uvarint` length prefixed array of `x`.
+- `[]T`: `uvarint` length prefixed array of type `T`.
 
 C2S (client to server)
 - `0`; Hello
@@ -86,7 +83,7 @@ C2S (client to server)
 - `2`; Set name
     - `exhaustive_str` name
 - `3`; Goodbye. Ends the existing session
-- `4`; (Unreliable). Wave button. 1/true indicates waving, 0/false indicates released. Sends 10x per second.
+- `4`; (Unreliable channel). Wave button. 1/true indicates waving, 0/false indicates released. Sends 10x per second.
 
 S2C (server to client)
 - `0`; HelloReply
